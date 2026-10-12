@@ -125,25 +125,6 @@ function decode(ids){
  const bytes=[];for(const id of ids){if(TOKEN_BYTES[id])bytes.push(...TOKEN_BYTES[id]);}
  return utf8Decoder.decode(new Uint8Array(bytes));
 }
-function conversationalReply(raw){
- const text=String(raw||'').trim();
- const s=text.toLowerCase().replace(/[^a-z0-9'?! ]/g,' ').replace(/\s+/g,' ').trim();
- if(!s)return "I’m listening. What would you like to talk about?";
- if(/^(hi|hello|hey|yo|hiya|good morning|good afternoon|good evening|sup|what's up)[!. ]*$/.test(s))return "Hey. I’m here. What’s on your mind?";
- if(/^(what is your name|your name|what's your name)[?! .]*$/.test(s))return "I’m Rook.";
- if(/^(thanks|thank you|thx|cheers)[!. ]*$/.test(s))return "You’re welcome. What shall we tackle next?";
- if(/^(bye|goodbye|see you|talk later)[!. ]*$/.test(s))return "See you later. This conversation stays saved in this browser unless you clear it.";
- if(/^(are you stupid|you're stupid|you are stupid|this is useless|you suck)[!. ]*$/.test(s))return "Fair criticism if I’m not being useful. I’m still limited, and I’d rather be clear about that than bluff. Tell me what you wanted from me and I’ll try a more direct approach.";
- if(/^(yes|yeah|yep|sure|okay|ok|alright|go on|continue)[!. ]*$/.test(s))return "Alright, I’m with you. Give me the next piece and I’ll follow along.";
- if(/^(no|nope|nah)[!. ]*$/.test(s))return "Got it. What would you prefer instead?";
- if(/^(i'm sad|i am sad|i feel sad|i'm upset|i am upset|i feel bad)[.! ]*$/.test(s))return "I’m sorry you’re having a rough time. Want to tell me what happened, or would you rather talk about something else for a while?";
- if(/^(i'm happy|i am happy|i feel happy|i'm excited|i am excited)[.! ]*$/.test(s))return "That’s good to hear. What happened?";
- if(/^(i'm bored|i am bored|im bored)[!. ]*$/.test(s))return "Let’s find something worth talking about. Want to explore an idea, debate something, solve a problem, or just chat?";
- if(/^(what do you think|your opinion|do you agree)[?! .]*$/.test(s))return "I can give you a straight opinion, but I need the idea or situation you want me to judge.";
- if(/^why\b/.test(s))return "I want to give you a useful answer, not invent a reason. What event or decision are you asking about?";
- if(/\?$/.test(s))return "I don’t have a reliable answer to that yet. My underlying model is still too small, and I don’t want to make something up. If you share a little context, I can help reason through it with you.";
- return "I’m following. What part matters most to you, or what happened next?";
-}
 function generate(prompt,maxTokens=100){
  let ids=encode(prompt);if(!ids.length)return 'Please send a message containing text.';
  const original=ids.length;let out=[];
@@ -171,7 +152,7 @@ function restoreChat(){
 }
 async function send(){if(busy)return;const input=document.getElementById('input');const text=input.value.trim();if(!text)return;input.value='';addMessage('You',text,'user');busy=true;document.getElementById('send').disabled=true;statusEl.textContent='Thinking…';
  await new Promise(r=>setTimeout(r,20));
- try{const prior=conversationHistory.slice(-2).map(turn=>`User: ${turn.user}\nRook: ${turn.rook}\n`).join('');const prompt=prior+`User: ${text}\nRook:`;const reply=conversationalReply(text)||generate(prompt,60);addMessage('Rook',reply,'rook');conversationHistory.push({user:text,rook:reply});if(conversationHistory.length>40)conversationHistory.shift();persistChat();}
+ try{const prior=conversationHistory.slice(-2).map(turn=>`User: ${turn.user}\nRook: ${turn.rook}\n`).join('');const prompt=prior+`User: ${text}\nRook:`;const reply=generate(prompt,60);addMessage('Rook',reply,'rook');conversationHistory.push({user:text,rook:reply});if(conversationHistory.length>40)conversationHistory.shift();persistChat();}
  catch(e){addMessage('System','The model hit an error: '+e.message,'rook');}
  finally{busy=false;document.getElementById('send').disabled=false;statusEl.textContent='Model ready';input.focus();}
 }
