@@ -1,1 +1,0 @@
-Temporary write-access verification for the Rook project. This file will be removed after confirming the GitHub connector can commit changes.
