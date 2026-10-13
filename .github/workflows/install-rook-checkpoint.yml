@@ -16,7 +16,7 @@ jobs:
           import json, re, urllib.request, pathlib, sys, hashlib
           p = pathlib.Path("index.html")
           html = p.read_text(encoding="utf-8")
-          pattern = r'(<script id="rook-model" type="application/json">)([\\s\\S]*?)(</script>)'
+          pattern = r'(<script id="rook-model" type="application/json">)([\s\S]*?)(</script>)'
           match = re.search(pattern, html)
           if not match:
               raise SystemExit("Embedded Rook model script not found")
