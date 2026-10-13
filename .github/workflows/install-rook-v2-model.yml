@@ -1,8 +1,10 @@
 name: Install Rook V2 model asset
 on:
+  workflow_dispatch:
   push:
     paths:
       - ".github/workflows/install-rook-v2-model.yml"
+      - "index.html"
 permissions:
   contents: write
 jobs:
