@@ -1,0 +1,39 @@
+name: Install Rook V2 model asset
+on:
+  push:
+    paths:
+      - ".github/workflows/install-rook-v2-model.yml"
+permissions:
+  contents: write
+jobs:
+  install-model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Fetch and validate V2 weights
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          url = "https://6a35086a-a546-4d8f-8e00-7539ee219f79.sandbox.floot.app/_cdn/static/f9682b91-14e4-496f-acee-5f9c3a2ed77a-rook-v2-browser.json"
+          req = urllib.request.Request(url, headers={"User-Agent":"Rook-V2-Installer"})
+          with urllib.request.urlopen(req, timeout=120) as r:
+              data = r.read()
+          obj = json.loads(data)
+          assert obj["architecture"] == "rook-v2-widehead"
+          assert obj["config"]["vocab_size"] == 337 and obj["config"]["block_size"] == 192
+          assert len(obj["merges"]) == 81 and len(obj["weights"]) >= 80
+          assert obj["tool_router"]["threshold"] > 0.9
+          with open("rook-v2-model.json", "wb") as f:
+              f.write(data)
+          print("Validated V2 model:", len(data), "bytes;", len(obj["weights"]), "weight arrays")
+          PY
+      - name: Commit model asset and remove installer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/install-rook-v2-model.yml
+          git add rook-v2-model.json .github/workflows/install-rook-v2-model.yml
+          git commit -m "Add Rook V2 trained model asset"
+          git push
