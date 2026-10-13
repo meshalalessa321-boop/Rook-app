@@ -57,8 +57,9 @@ def main():
  p=argparse.ArgumentParser();p.add_argument("--steps",type=int,default=5000);p.add_argument("--d",type=int,default=384);p.add_argument("--layers",type=int,default=8);p.add_argument("--heads",type=int,default=6);p.add_argument("--ctx",type=int,default=512);p.add_argument("--batch",type=int,default=8);p.add_argument("--smoke",action="store_true");a=p.parse_args()
  random.seed(1701);torch.manual_seed(1701);dev="cuda" if torch.cuda.is_available() else "cpu";torch.set_num_threads(8)
  tr,va,te,meta=data(1701);out=Path("artifacts/rook-next");out.mkdir(parents=True,exist_ok=True);(out/"dataset_manifest.json").write_text(json.dumps(meta,indent=2))
+ if a.smoke:a.d,a.layers,a.heads,a.ctx,a.batch=192,4,6,128,2
  m=Rook(a.d,a.layers,a.heads,a.ctx).to(dev);params=sum(x.numel() for x in m.parameters());print(json.dumps({"device":dev,"parameters":params,"data":meta}),flush=True)
- assert params>=10_000_000 and len(tr)>1000 and len(va)>20 and len(te)>20
+ assert (params>=10_000_000 or a.smoke) and len(tr)>1000 and len(va)>20 and len(te)>20
  opt=torch.optim.AdamW(m.parameters(),lr=3e-4,betas=(.9,.95),weight_decay=.1);best=1e9;hist=[];start=time.time()
  if a.smoke:a.steps=2
  for step in range(1,a.steps+1):
