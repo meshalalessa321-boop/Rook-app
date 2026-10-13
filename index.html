@@ -153,9 +153,17 @@ function forwardV2(ids){
  return linear([last],W['output_head.weight'],W['output_head.bias'],337,96)[0];
 }
 
-function sampleNext(logits,temp=0.85,topK=8){
- const scaled=logits.map((v,i)=>({i,v:v/temp})).sort((a,b)=>b.v-a.v).slice(0,Math.min(topK,logits.length));
- const max=scaled[0].v, probs=scaled.map(x=>Math.exp(x.v-max));let sum=probs.reduce((a,b)=>a+b,0),r=Math.random()*sum;
+function sampleNext(logits,temp=0.72,topK=12,history=[]){
+ // Suppress leaked tool-control markup and discourage short token loops.
+ const recent=new Set(history.slice(-12));
+ const adjusted=logits.map((v,i)=>{
+  const raw=TOKEN_BYTES[i]?utf8Decoder.decode(new Uint8Array(TOKEN_BYTES[i])):'';
+  if(raw.includes('<')||raw.includes('>'))return -Infinity;
+  return recent.has(i)?v-0.65:v;
+ });
+ const scaled=adjusted.map((v,i)=>({i,v:v/temp})).filter(x=>Number.isFinite(x.v)).sort((a,b)=>b.v-a.v).slice(0,Math.min(topK,adjusted.length));
+ if(!scaled.length)return 32;
+ const max=scaled[0].v,probs=scaled.map(x=>Math.exp(x.v-max));let sum=probs.reduce((a,b)=>a+b,0),r=Math.random()*sum;
  for(let i=0;i<scaled.length;i++){r-=probs[i];if(r<=0)return scaled[i].i;}return scaled[0].i;
 }
 function encode(s){
@@ -171,13 +179,18 @@ function decode(ids){
  const bytes=[];for(const id of ids){if(TOKEN_BYTES[id])bytes.push(...TOKEN_BYTES[id]);}
  return utf8Decoder.decode(new Uint8Array(bytes));
 }
-function generate(prompt,maxTokens=100){
+function generate(prompt,maxTokens=72){
  let ids=encode(prompt);if(!ids.length)return 'Please send a message containing text.';
- const original=ids.length;let out=[];
- for(let i=0;i<maxTokens;i++){const logits=forward(ids);const next=sampleNext(logits);ids.push(next);out.push(next);if(i>18&&decode(out).includes('\n'))break;}
- let reply=decode(out).split('\n')[0].trim();
- if(!reply)reply=decode(out).trim();
- return reply||'(Rook produced no visible text this time.)';
+ let out=[];
+ for(let i=0;i<maxTokens;i++){
+  const next=sampleNext(forward(ids),0.72,12,out);
+  ids.push(next);out.push(next);
+  const partial=decode(out);
+  if(partial.includes('\\n')||partial.includes('\\r'))break;
+  if(out.length>=12){const tail=out.slice(-12);if(tail.every(id=>id===tail[0]))break;}
+ }
+ const reply=decode(out).split(/[\\r\\n]/)[0].trim();
+ return reply||'I couldn’t form a usable reply. Please try again.';
 }
 
 // Local tools: explicit commands only. These tools do not pretend the neural model selected them.
