@@ -133,6 +133,36 @@ function generate(prompt,maxTokens=100){
  if(!reply)reply=decode(out).trim();
  return reply||'(Rook produced no visible text this time.)';
 }
+
+// Local tools: explicit commands only. These tools do not pretend the neural model selected them.
+const ROOK_TOOLS = {
+  calc: {description:"Safely evaluate basic arithmetic. Usage: /calc (12 * 7) / 3"},
+  time: {description:"Show the current local time. Usage: /time"},
+  memory: {description:"Search saved memories and recent chat. Usage: /memory school"},
+  tools: {description:"List available local tools. Usage: /tools"}
+};
+function safeArithmetic(source){
+  const s=source.replace(/\s+/g,'');
+  if(!s || !/^[0-9.+\-*/()%]+$/.test(s)) throw new Error("Use numbers and + - * / % parentheses only.");
+  let i=0;
+  function expr(){let v=term();while(s[i]==='+'||s[i]==='-'){const op=s[i++],r=term();v=op==='+'?v+r:v-r;}return v;}
+  function term(){let v=factor();while(s[i]==='*'||s[i]==='/'||s[i]==='%'){const op=s[i++],r=factor();if((op==='/'||op==='%')&&r===0)throw new Error("Division by zero.");v=op==='*'?v*r:op==='/'?v/r:v%r;}return v;}
+  function factor(){if(s[i]==='+'){i++;return factor();}if(s[i]==='-'){i++;return -factor();}if(s[i]==='('){i++;const v=expr();if(s[i++]!==')')throw new Error("Missing closing parenthesis.");return v;}const start=i;while(i<s.length&&/[0-9.]/.test(s[i]))i++;if(start===i)throw new Error("Expected a number.");const raw=s.slice(start,i);if((raw.match(/\./g)||[]).length>1)throw new Error("Invalid number.");const n=Number(raw);if(!Number.isFinite(n))throw new Error("Invalid number.");return n;}
+  const value=expr();if(i!==s.length)throw new Error("Couldn't parse that expression.");if(!Number.isFinite(value))throw new Error("Result is not finite.");return Number(value.toPrecision(12)).toString();
+}
+function runRookTool(text){
+  const m=text.match(/^\/(calc|time|memory|tools)\b\s*([\s\S]*)$/i);if(!m)return null;
+  const name=m[1].toLowerCase(),arg=(m[2]||'').trim();
+  if(name==='calc'){try{return 'Calculator result: '+safeArithmetic(arg);}catch(e){return 'Calculator: '+e.message;}}
+  if(name==='time')return 'Local time: '+new Intl.DateTimeFormat(undefined,{dateStyle:'full',timeStyle:'long'}).format(new Date());
+  if(name==='tools')return 'Available local tools:\n'+Object.entries(ROOK_TOOLS).map(([k,v])=>'/'+k+'  '+v.description).join('\n');
+  if(!arg)return 'Memory search: add a search term, for example /memory school.';
+  const q=arg.toLowerCase(),found=[];
+  try{for(const item of JSON.parse(localStorage.getItem('rook-zero-memory-v1')||'[]'))if((String(item.title)+' '+String(item.body)).toLowerCase().includes(q))found.push('Saved memory: '+item.title+' — '+item.body);}
+  catch(e){}
+  for(const turn of conversationHistory.slice(-40)){if((turn.user+' '+turn.rook).toLowerCase().includes(q))found.push('Chat: You: '+turn.user+' | Rook: '+turn.rook);}
+  return found.length?found.slice(-8).join('\n\n'):'No matching saved memories or recent chat found.';
+}
 let busy=false;
 const conversationHistory=[];
 const CHAT_KEY='rook-zero-chat-v1';
@@ -152,7 +182,7 @@ function restoreChat(){
 }
 async function send(){if(busy)return;const input=document.getElementById('input');const text=input.value.trim();if(!text)return;input.value='';addMessage('You',text,'user');busy=true;document.getElementById('send').disabled=true;statusEl.textContent='Thinking…';
  await new Promise(r=>setTimeout(r,20));
- try{const prior=conversationHistory.slice(-2).map(turn=>`User: ${turn.user}\nRook: ${turn.rook}\n`).join('');const prompt=prior+`User: ${text}\nRook:`;const reply=generate(prompt,60);addMessage('Rook',reply,'rook');conversationHistory.push({user:text,rook:reply});if(conversationHistory.length>40)conversationHistory.shift();persistChat();}
+ try{const prior=conversationHistory.slice(-2).map(turn=>`User: ${turn.user}\nRook: ${turn.rook}\n`).join('');const prompt=prior+`User: ${text}\nRook:`;const toolReply=runRookTool(text);const reply=toolReply!==null?toolReply:generate(prompt,60);addMessage('Rook',reply,'rook');conversationHistory.push({user:text,rook:reply});if(conversationHistory.length>40)conversationHistory.shift();persistChat();}
  catch(e){addMessage('System','The model hit an error: '+e.message,'rook');}
  finally{busy=false;document.getElementById('send').disabled=false;statusEl.textContent='Model ready';input.focus();}
 }
