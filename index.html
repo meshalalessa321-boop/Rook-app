@@ -88,6 +88,7 @@ function linear(rows,weight,bias,outDim,inDim){const out=new Array(rows.length);
 function erf(x){const sign=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return sign*y;}
 function gelu(x){return 0.5*x*(1+erf(x/Math.SQRT2));}
 function forward(ids){
+ if(V2_ACTIVE)return forwardV2(ids);
  ids=ids.slice(-BLOCK);const T=ids.length;
  let x=ids.map((id,t)=>{const row=new Array(N);for(let j=0;j<N;j++)row[j]=W['token_emb.weight'][id*N+j]+W['pos_emb.weight'][t*N+j];return row;});
  for(let l=0;l<C.n_layer;l++){
@@ -112,6 +113,46 @@ function forward(ids){
  const logits=new Array(V);for(let v=0;v<V;v++){let s=0;for(let j=0;j<N;j++)s+=W['head.weight'][v*N+j]*final[j];logits[v]=s;}
  return logits;
 }
+
+function runTransformerBlock(rows,p,width,heads){
+ const T=rows.length,headDim=width/heads;
+ const norm1=layerNorm(rows,W[p+'ln1.weight'],W[p+'ln1.bias']);
+ const qkv=linear(norm1,W[p+'attn.qkv.weight'],W[p+'attn.qkv.bias'],3*width,width);
+ const attnOut=Array.from({length:T},()=>new Array(width).fill(0));
+ for(let t=0;t<T;t++)for(let h=0;h<heads;h++){
+  const scores=new Array(t+1);let max=-Infinity;
+  for(let j=0;j<=t;j++){let dot=0;for(let d=0;d<headDim;d++)dot+=qkv[t][h*headDim+d]*qkv[j][width+h*headDim+d];scores[j]=dot/Math.sqrt(headDim);if(scores[j]>max)max=scores[j];}
+  let total=0;for(let j=0;j<=t;j++){scores[j]=Math.exp(scores[j]-max);total+=scores[j];}
+  for(let j=0;j<=t;j++){const a=scores[j]/total;for(let d=0;d<headDim;d++)attnOut[t][h*headDim+d]+=a*qkv[j][2*width+h*headDim+d];}
+ }
+ const projected=linear(attnOut,W[p+'attn.proj.weight'],W[p+'attn.proj.bias'],width,width);
+ let x=rows.map((row,t)=>row.map((v,j)=>v+projected[t][j]));
+ const norm2=layerNorm(x,W[p+'ln2.weight'],W[p+'ln2.bias']);
+ const hidden=linear(norm2,W[p+'mlp.0.weight'],W[p+'mlp.0.bias'],4*width,width).map(row=>row.map(gelu));
+ const mlp=linear(hidden,W[p+'mlp.2.weight'],W[p+'mlp.2.bias'],width,4*width);
+ return x.map((row,t)=>row.map((v,j)=>v+mlp[t][j]));
+}
+function v2Hidden(ids){
+ ids=ids.slice(-C.block_size);const width=48;
+ let x=ids.map((id,t)=>{
+  const row=new Array(width),isExtra=id>=320,embBase=(isExtra?id-320:id)*width,posBase=(t<96?t:t-96)*width;
+  for(let j=0;j<width;j++)row[j]=(isExtra?W['extra_token_emb.weight'][embBase+j]:W['core.token_emb.weight'][embBase+j])+(t<96?W['core.pos_emb.weight'][posBase+j]:W['extended_pos_emb.weight'][posBase+j]);
+  return row;
+ });
+ for(let l=0;l<2;l++)x=runTransformerBlock(x,'core.blocks.'+l+'.',48,3);
+ x=layerNorm(x,W['core.ln_f.weight'],W['core.ln_f.bias']);
+ x=linear(x,W['adapter_up.weight'],W['adapter_up.bias'],96,48);
+ for(let l=0;l<4;l++){
+  const residual=runTransformerBlock(x,'adapter_blocks.'+l+'.',96,6),gate=Math.tanh(W['gates'][l]);
+  x=x.map((row,t)=>row.map((v,j)=>v+gate*residual[t][j]));
+ }
+ return x;
+}
+function forwardV2(ids){
+ const hidden=v2Hidden(ids),last=hidden[hidden.length-1];
+ return linear([last],W['output_head.weight'],W['output_head.bias'],337,96)[0];
+}
+
 function sampleNext(logits,temp=0.85,topK=8){
  const scaled=logits.map((v,i)=>({i,v:v/temp})).sort((a,b)=>b.v-a.v).slice(0,Math.min(topK,logits.length));
  const max=scaled[0].v, probs=scaled.map(x=>Math.exp(x.v-max));let sum=probs.reduce((a,b)=>a+b,0),r=Math.random()*sum;
