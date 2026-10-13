@@ -226,7 +226,7 @@ function restoreChat(){
   }
  }catch(e){}
 }
-async function send(){if(busy)return;const input=document.getElementById('input');const text=input.value.trim();if(!text)return;input.value='';addMessage('You',text,'user');busy=true;document.getElementById('send').disabled=true;statusEl.textContent='Thinking…';
+async function send(){if(busy)return;if(!modelReady){statusEl.textContent='Model is still loading…';return;}const input=document.getElementById('input');const text=input.value.trim();if(!text)return;input.value='';addMessage('You',text,'user');busy=true;document.getElementById('send').disabled=true;statusEl.textContent='Thinking…';
  await new Promise(r=>setTimeout(r,20));
  try{const prior=conversationHistory.slice(-2).map(turn=>`User: ${turn.user}\nRook: ${turn.rook}\n`).join('');const prompt=prior+`User: ${text}\nRook:`;const toolReply=runRookTool(text);const reply=toolReply!==null?toolReply:generate(prompt,60);addMessage('Rook',reply,'rook');conversationHistory.push({user:text,rook:reply});if(conversationHistory.length>40)conversationHistory.shift();persistChat();}
  catch(e){addMessage('System','The model hit an error: '+e.message,'rook');}
@@ -273,6 +273,20 @@ document.getElementById('exportMemory').addEventListener('click',()=>{
  const blob=new Blob([JSON.stringify({app:'Rook Zero Memory',exportedAt:new Date().toISOString(),memories:getMemories()},null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='rook-memory-backup.json';a.click();URL.revokeObjectURL(url);
 });
-statusEl.textContent='Model ready';
+async function loadV2Model(){
+ statusEl.textContent='Loading Rook V2…';document.getElementById('send').disabled=true;
+ try{
+  const response=await fetch('./rook-v2-model.json',{cache:'no-store'});
+  if(!response.ok)throw new Error('Model asset HTTP '+response.status);
+  const candidate=await response.json();
+  if(candidate.architecture!=='rook-v2-widehead'||candidate.config.vocab_size!==337||candidate.config.block_size!==192||candidate.merges.length!==81||!candidate.tool_router)throw new Error('V2 model validation failed');
+  for(const key of ['core.token_emb.weight','extended_pos_emb.weight','adapter_up.weight','adapter_blocks.3.mlp.2.weight','output_head.weight'])if(!candidate.weights[key])throw new Error('Missing V2 weights: '+key);
+  configureModel(candidate);statusEl.textContent='Rook V2 ready';
+ }catch(error){
+  console.error('Rook V2 failed to load; retaining embedded base model.',error);
+  configureModel(BASE_DATA);statusEl.textContent='Rook base model ready (V2 unavailable)';
+ }finally{modelReady=true;document.getElementById('send').disabled=false;}
+}
+loadV2Model();
 </script>
 </body></html>
