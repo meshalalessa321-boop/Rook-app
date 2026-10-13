@@ -198,7 +198,7 @@ function safeArithmetic(source){
   const value=expr();if(i!==s.length)throw new Error("Couldn't parse that expression.");if(!Number.isFinite(value))throw new Error("Result is not finite.");return Number(value.toPrecision(12)).toString();
 }
 function runRookTool(text){
-  const m=text.match(/^\/(calc|time|memory|tools)\b\s*([\s\S]*)$/i);if(!m)return null;
+  const m=text.match(/^\/(calc|time|remember|memory|tools)\b\s*([\s\S]*)$/i);if(!m)return null;
   const name=m[1].toLowerCase(),arg=(m[2]||'').trim();
   if(name==='calc'){try{return 'Calculator result: '+safeArithmetic(arg);}catch(e){return 'Calculator: '+e.message;}}
   if(name==='time')return 'Local time: '+new Intl.DateTimeFormat(undefined,{dateStyle:'full',timeStyle:'long'}).format(new Date());
