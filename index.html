@@ -184,6 +184,7 @@ function generate(prompt,maxTokens=100){
 const ROOK_TOOLS = {
   calc: {description:"Safely evaluate basic arithmetic. Usage: /calc (12 * 7) / 3"},
   time: {description:"Show the current local time. Usage: /time"},
+  remember: {description:"Save a note to local persistent memory. Usage: /remember title | note"},
   memory: {description:"Search saved memories and recent chat. Usage: /memory school"},
   tools: {description:"List available local tools. Usage: /tools"}
 };
@@ -202,6 +203,12 @@ function runRookTool(text){
   if(name==='calc'){try{return 'Calculator result: '+safeArithmetic(arg);}catch(e){return 'Calculator: '+e.message;}}
   if(name==='time')return 'Local time: '+new Intl.DateTimeFormat(undefined,{dateStyle:'full',timeStyle:'long'}).format(new Date());
   if(name==='tools')return 'Available local tools:\n'+Object.entries(ROOK_TOOLS).map(([k,v])=>'/'+k+'  '+v.description).join('\n');
+  if(name==='remember'){
+   const parts=arg.split('|'),title=(parts.shift()||'').trim(),body=parts.join('|').trim();
+   if(!title||!body)return 'Usage: /remember title | note';
+   const items=getMemories();items.unshift({title,body,savedAt:new Date().toLocaleString()});saveMemories(items);renderMemories();
+   return 'Saved to local memory: '+title;
+  }
   if(!arg)return 'Memory search: add a search term, for example /memory school.';
   const q=arg.toLowerCase(),found=[];
   try{for(const item of JSON.parse(localStorage.getItem('rook-zero-memory-v1')||'[]'))if((String(item.title)+' '+String(item.body)).toLowerCase().includes(q))found.push('Saved memory: '+item.title+' — '+item.body);}
@@ -279,7 +286,7 @@ async function loadV2Model(){
   const response=await fetch('./rook-v2-model.json',{cache:'no-store'});
   if(!response.ok)throw new Error('Model asset HTTP '+response.status);
   const candidate=await response.json();
-  if(candidate.architecture!=='rook-v2-widehead'||candidate.config.vocab_size!==337||candidate.config.block_size!==192||candidate.merges.length!==81||!candidate.tool_router)throw new Error('V2 model validation failed');
+  if(candidate.architecture!=='rook-v2-widehead'||candidate.config.vocab_size!==337||candidate.config.block_size!==192||candidate.merges.length!==81)throw new Error('V2 model validation failed');
   for(const key of ['core.token_emb.weight','extended_pos_emb.weight','adapter_up.weight','adapter_blocks.3.mlp.2.weight','output_head.weight'])if(!candidate.weights[key])throw new Error('Missing V2 weights: '+key);
   configureModel(candidate);statusEl.textContent='Rook V2 ready';
  }catch(error){
