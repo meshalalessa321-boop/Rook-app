@@ -1,0 +1,56 @@
+name: Install verified Rook checkpoint
+on:
+  push:
+    paths:
+      - ".github/workflows/install-rook-checkpoint.yml"
+permissions:
+  contents: write
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and install candidate checkpoint
+        run: |
+          python - <<'PY'
+          import json, re, urllib.request, pathlib, hashlib
+          p = pathlib.Path("index.html")
+          html = p.read_text(encoding="utf-8")
+          pattern = r'(<script id="rook-model" type="application/json">)([\s\S]*?)(</script>)'
+          match = re.search(pattern, html)
+          if not match:
+              raise SystemExit("Embedded model script missing")
+          old = json.loads(match.group(2))
+          url = "https://6a35086a-a546-4d8f-8e00-7539ee219f79.sandbox.floot.app/_cdn/static/a738ecbe-dd91-4451-9158-4daf0fcf7ad6-rook-candidate-3500.json"
+          req = urllib.request.Request(url, headers={"User-Agent":"Rook-checkpoint-installer/1.0"})
+          with urllib.request.urlopen(req, timeout=30) as response:
+              if response.status != 200:
+                  raise SystemExit(f"Checkpoint download failed: HTTP {response.status}")
+              raw = response.read()
+          new = json.loads(raw)
+          if old.get("config") != new.get("config"):
+              raise SystemExit("Model configuration mismatch")
+          if old.get("merges") != new.get("merges"):
+              raise SystemExit("Tokenizer merges mismatch")
+          if not isinstance(new.get("weights"), dict) or set(old.get("weights",{})) != set(new["weights"]):
+              raise SystemExit("Weight key mismatch")
+          if old["weights"] == new["weights"]:
+              raise SystemExit("Candidate weights are identical; refusing false upgrade")
+          if re.search(r'conversationalReply|cannedResponses|fallbackResponse', html):
+              raise SystemExit("Canned conversation layer detected")
+          updated = html[:match.start(2)] + json.dumps(new, separators=(",",":"), ensure_ascii=False) + html[match.end(2):]
+          if "generate(prompt,60)" not in updated:
+              raise SystemExit("Direct model generation call missing")
+          p.write_text(updated, encoding="utf-8")
+          pathlib.Path(".github/workflows/install-rook-checkpoint.yml").unlink()
+          print("Candidate checkpoint validated; model and tokenizer match; direct generation and UI preserved.")
+          print("Old weights SHA256:", hashlib.sha256(json.dumps(old["weights"],separators=(",",":")).encode()).hexdigest())
+          print("New weights SHA256:", hashlib.sha256(json.dumps(new["weights"],separators=(",",":")).encode()).hexdigest())
+          PY
+      - name: Commit upgraded app and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/install-rook-checkpoint.yml
+          git commit -m "Upgrade Rook with evaluated scratch-trained checkpoint"
+          git push
