@@ -104,7 +104,7 @@ def main():
  for step in range(1,a.steps+1):
   m.train();xs=[];ys=[]
   for _ in range(a.batch):
-   x,y=pack(random.choice(tr),a.ctx);xs.append(F.pad(x,(a.ctx-len(x),0),value=PAD));ys.append(F.pad(y,(a.ctx-len(y),0),value=-100))
+   x,y=pack(random.choice(tr),a.ctx);xs.append(F.pad(x,(0,a.ctx-len(x)),value=PAD));ys.append(F.pad(y,(0,a.ctx-len(y)),value=-100))
   x=torch.stack(xs).to(dev);y=torch.stack(ys).to(dev);opt.zero_grad(set_to_none=True)
   with torch.autocast(device_type="cuda",dtype=torch.bfloat16,enabled=dev=="cuda" and torch.cuda.is_bf16_supported()):z=m(x);loss=F.cross_entropy(z.flatten(0,1),y.flatten(),ignore_index=-100)
   if not torch.isfinite(loss):raise RuntimeError("non-finite training loss")
