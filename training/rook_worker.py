@@ -93,7 +93,7 @@ def main():
         if "torch_rng_state" in state:
             torch.set_rng_state(state["torch_rng_state"].cpu())
         if device == "cuda" and state.get("cuda_rng_state"):
-            torch.cuda.set_rng_state_all(state["cuda_rng_state"])
+            torch.cuda.set_rng_state_all([rng.cpu() for rng in state["cuda_rng_state"]])
         print(json.dumps({"event": "resume", "step": step, "best_val_loss": best_val}), flush=True)
     else:
         print(json.dumps({"event": "fresh_random_initialization", "step": 0,
@@ -114,12 +114,13 @@ def main():
             "saved_at_unix": time.time(),
         }, resume_path)
 
+    run_start_step = step
     started = time.monotonic()
     last_loss = None
     while not STOP:
         if time.monotonic() - started >= args.max_runtime_seconds:
             break
-        if args.max_steps and (step - int(history[0].get("step", 0) if history else 0)) >= args.max_steps:
+        if args.max_steps and (step - run_start_step) >= args.max_steps:
             break
 
         model.train()
