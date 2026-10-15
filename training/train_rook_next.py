@@ -48,10 +48,16 @@ class Rook(nn.Module):
   for b in self.b:z=b(z)
   return self.o(self.n(z))
 def ev(m,ex,dev,c,limit=500):
+ # Use the same left-padding and position indices as training and browser inference.
  m.eval();s=n=0
  with torch.no_grad():
   for e in ex[:limit]:
-   x,y=pack(e,c);x=x[None].to(dev);y=y[None].to(dev);z=m(x);s+=F.cross_entropy(z.flatten(0,1),y.flatten(),ignore_index=-100,reduction="sum").item();n+=y.ne(-100).sum().item()
+   x,y=pack(e,c)
+   x=F.pad(x,(c-len(x),0),value=PAD)
+   y=F.pad(y,(c-len(y),0),value=-100)
+   x=x[None].to(dev);y=y[None].to(dev);z=m(x)
+   s+=F.cross_entropy(z.flatten(0,1),y.flatten(),ignore_index=-100,reduction="sum").item()
+   n+=y.ne(-100).sum().item()
  return s/max(1,n)
 def main():
  p=argparse.ArgumentParser();p.add_argument("--steps",type=int,default=5000);p.add_argument("--d",type=int,default=384);p.add_argument("--layers",type=int,default=8);p.add_argument("--heads",type=int,default=6);p.add_argument("--ctx",type=int,default=512);p.add_argument("--batch",type=int,default=8);p.add_argument("--smoke",action="store_true");a=p.parse_args()
