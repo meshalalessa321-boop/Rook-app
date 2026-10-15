@@ -52,8 +52,21 @@ def data(seed):
  print(json.dumps({"event":"personal_corrections_loaded","count":correction_count,"path":str(correction_path)}),flush=True)
  return train_examples,valid_examples,test_examples,meta
 def pack(e,ctx):
- full=[BOS]+list(e["prompt"].encode())+list(e["answer"].encode())+[EOS];off=max(0,len(full)-ctx);full=full[-ctx:]
- x=torch.tensor(full[:-1]);y=torch.tensor(full[1:]); mask=max(0,1+len(e["prompt"].encode())-off-1);y[:mask]=-100
+ # Train with tokens starting at position zero, exactly as autoregressive inference does.
+ # Keep the start of the answer and enough of the prompt suffix; never train on a
+ # long answer after accidentally truncating away the entire prompt.
+ prompt=[BOS]+list(e["prompt"].encode("utf-8"))
+ answer=list(e["answer"].encode("utf-8"))+[EOS]
+ max_answer=max(1,ctx-32)
+ if len(answer)>max_answer:
+  answer=answer[:max_answer-1]+[EOS]
+ max_prompt=max(1,ctx+1-len(answer))
+ if len(prompt)>max_prompt:
+  prompt=prompt[-max_prompt:]
+ full=prompt+answer
+ x=torch.tensor(full[:-1],dtype=torch.long)
+ y=torch.tensor(full[1:],dtype=torch.long)
+ y[:max(0,len(prompt)-1)]=-100
  return x,y
 class Block(nn.Module):
  def __init__(self,d,h):
@@ -73,8 +86,8 @@ def ev(m,ex,dev,c,limit=500):
  with torch.no_grad():
   for e in ex[:limit]:
    x,y=pack(e,c)
-   x=F.pad(x,(c-len(x),0),value=PAD)
-   y=F.pad(y,(c-len(y),0),value=-100)
+   x=F.pad(x,(0,c-len(x)),value=PAD)
+   y=F.pad(y,(0,c-len(y)),value=-100)
    x=x[None].to(dev);y=y[None].to(dev);z=m(x)
    s+=F.cross_entropy(z.flatten(0,1),y.flatten(),ignore_index=-100,reduction="sum").item()
    n+=y.ne(-100).sum().item()
