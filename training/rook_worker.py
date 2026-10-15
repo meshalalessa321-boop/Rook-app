@@ -88,7 +88,7 @@ def main():
         model.load_state_dict(state["model"])
         optimizer.load_state_dict(state["optimizer"])
         step = int(state["step"])
-        best_val = float(state.get("best_val_loss", float("inf")))
+        best_val = float("inf") if state.get("eval_version", 0) < 2 else float(state.get("best_val_loss", float("inf")))
         history = state.get("history", [])
         if "python_rng_state" in state:
             random.setstate(state["python_rng_state"])
@@ -109,6 +109,7 @@ def main():
             "config": config,
             "step": step,
             "best_val_loss": best_val,
+            "eval_version": 2,
             "history": history[-500:],
             "python_rng_state": random.getstate(),
             "torch_rng_state": torch.get_rng_state(),
@@ -166,6 +167,7 @@ def main():
     report = {
         "status": "checkpointed",
         "resumed_from_checkpoint": resumed_from_checkpoint,
+        "eval_version": 2,
         "architecture": "random-init byte Transformer",
         "parameters": sum(p.numel() for p in model.parameters()),
         "pretrained_weights": False,
