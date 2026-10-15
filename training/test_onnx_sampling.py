@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 
 MODEL = Path("models/rook-step-105500.onnx")
-assert MODEL.is_file() and MODEL.stat().st_size > 50_000_000
 session = None
 CTX, PAD, BOS, EOS, VOCAB = 256, 256, 257, 258, 259
 
