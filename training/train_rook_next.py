@@ -30,7 +30,27 @@ def data(seed):
  rng=random.Random(seed); roots=sorted({e["root"] for e in ex});rng.shuffle(roots);n=len(roots)
  tr=set(roots[:int(.9*n)]);va=set(roots[int(.9*n):int(.95*n)]);te=set(roots[int(.95*n):])
  split=lambda s:[e for e in ex if e["root"] in s]
- return split(tr),split(va),split(te),{"dataset":"OpenAssistant/oasst1","license":"CC BY 4.0","messages":len(rows),"roots":n,"examples":len(ex),"train":sum(e["root"] in tr for e in ex),"validation":sum(e["root"] in va for e in ex),"test":sum(e["root"] in te for e in ex),"split_unit":"conversation root"}
+ train_examples,valid_examples,test_examples=split(tr),split(va),split(te)
+ # Personal corrections are training-only. Never mix them into validation/test metrics.
+ correction_path=Path(__file__).resolve().parent/"user_corrections.jsonl"
+ correction_count=0
+ if correction_path.exists():
+  for line_no,line in enumerate(correction_path.read_text(encoding="utf-8").splitlines(),1):
+   if not line.strip(): continue
+   try: item=json.loads(line)
+   except json.JSONDecodeError as exc: raise ValueError(f"Invalid JSON in {correction_path.name} line {line_no}: {exc}") from exc
+   prompt=str(item.get("prompt","")).strip()
+   answer=str(item.get("answer","")).strip()
+   if not prompt or not answer: continue
+   if len(prompt.encode("utf-8"))>12000 or len(answer.encode("utf-8"))>5000:
+    print(f"Skipping oversized user correction on line {line_no}",flush=True);continue
+   if not prompt.endswith("Assistant:"): prompt += "\\nAssistant:"
+   if not answer.endswith("\\n"): answer += "\\n"
+   train_examples.append({"root":"user-correction","prompt":prompt,"answer":answer})
+   correction_count+=1
+ meta={"dataset":"OpenAssistant/oasst1","license":"CC BY 4.0","messages":len(rows),"roots":n,"examples":len(ex),"train":sum(e["root"] in tr for e in ex),"validation":sum(e["root"] in va for e in ex),"test":sum(e["root"] in te for e in ex),"personal_corrections":correction_count,"correction_file":correction_path.name,"split_unit":"conversation root; personal corrections train-only"}
+ print(json.dumps({"event":"personal_corrections_loaded","count":correction_count,"path":str(correction_path)}),flush=True)
+ return train_examples,valid_examples,test_examples,meta
 def pack(e,ctx):
  full=[BOS]+list(e["prompt"].encode())+list(e["answer"].encode())+[EOS];off=max(0,len(full)-ctx);full=full[-ctx:]
  x=torch.tensor(full[:-1]);y=torch.tensor(full[1:]); mask=max(0,1+len(e["prompt"].encode())-off-1);y[:mask]=-100
