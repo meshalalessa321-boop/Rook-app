@@ -80,6 +80,7 @@ def main():
     step = 0
     best_val = float("inf")
     history = []
+    resumed_from_checkpoint = resume_path.exists()
     if resume_path.exists():
         state = torch.load(resume_path, map_location=device, weights_only=False)
         if state.get("config") != config:
@@ -164,6 +165,7 @@ def main():
     elapsed = round(time.monotonic() - started, 1)
     report = {
         "status": "checkpointed",
+        "resumed_from_checkpoint": resumed_from_checkpoint,
         "architecture": "random-init byte Transformer",
         "parameters": sum(p.numel() for p in model.parameters()),
         "pretrained_weights": False,
