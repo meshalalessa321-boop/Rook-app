@@ -1,0 +1,71 @@
+name: Rook 24-7 Training Worker
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rook-training-worker
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check out Rook
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+
+      - name: Restore latest training state and dataset cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            artifacts/rook-next
+            ~/.cache/huggingface/datasets
+            ~/.cache/huggingface/hub
+          key: rook-state-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            rook-state-${{ runner.os }}-
+
+      - name: Install training dependencies
+        run: python -m pip install -r training/requirements.txt
+
+      - name: Run pipeline tests
+        working-directory: training
+        run: python -m unittest -v test_train_rook_next.py
+
+      - name: Train Rook and checkpoint progress
+        id: train-rook
+        run: python training/rook_worker.py --max-runtime-seconds 20400 --ctx 256 --batch 2 --save-every 25 --eval-every 100
+
+      - name: Save training state for the next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            artifacts/rook-next
+            ~/.cache/huggingface/datasets
+            ~/.cache/huggingface/hub
+          key: rook-state-${{ runner.os }}-${{ github.run_id }}
+
+      - name: Upload Rook's progress report
+        if: always() && hashFiles('artifacts/rook-next/report.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-progress-${{ github.run_number }}
+          path: |
+            artifacts/rook-next/report.json
+            artifacts/rook-next/dataset_manifest.json
+          if-no-files-found: ignore
+          retention-days: 30
