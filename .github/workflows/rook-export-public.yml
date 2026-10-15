@@ -1,0 +1,98 @@
+name: Export Rook weights for inference
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rook-export-public.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            artifacts/rook-next
+            ~/.cache/huggingface/datasets
+            ~/.cache/huggingface/hub
+          key: rook-state-${{ runner.os }}-export-${{ github.run_id }}
+          restore-keys: |
+            rook-state-${{ runner.os }}-
+      - name: Verify checkpoint files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/rook-next/resume.pt
+          test -s artifacts/rook-next/best.pt
+          test -s artifacts/rook-next/report.json
+          python - <<'PY'
+          import json, pathlib, torch, hashlib
+          root = pathlib.Path("artifacts/rook-next")
+          report = json.loads((root / "report.json").read_text())
+          resume = torch.load(root / "resume.pt", map_location="cpu", weights_only=False)
+          best = torch.load(root / "best.pt", map_location="cpu", weights_only=False)
+          assert report.get("pretrained_weights") is False
+          assert report.get("external_inference_api") is False
+          assert resume.get("config") == best.get("config")
+          assert int(resume["step"]) >= int(best["step"])
+          print(json.dumps({
+            "report_step": report.get("step"),
+            "resume_step": resume.get("step"),
+            "best_step": best.get("step"),
+            "config": best.get("config"),
+            "resume_bytes": (root / "resume.pt").stat().st_size,
+            "best_bytes": (root / "best.pt").stat().st_size,
+            "resume_sha256": hashlib.sha256((root / "resume.pt").read_bytes()).hexdigest(),
+            "best_sha256": hashlib.sha256((root / "best.pt").read_bytes()).hexdigest(),
+            "pretrained_weights": False,
+            "external_inference_api": False
+          }, indent=2))
+          PY
+      - name: Publish downloadable trained weights
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="rook-checkpoint-${{ github.run_id }}"
+          gh release create "$TAG" \
+            artifacts/rook-next/best.pt \
+            artifacts/rook-next/resume.pt \
+            artifacts/rook-next/report.json \
+            artifacts/rook-next/dataset_manifest.json \
+            --title "Rook trained checkpoint / run ${{ github.run_number }}" \
+            --notes "From-scratch Rook weights. No pretrained weights and no external inference API."
+          mkdir -p rook-status
+          gh release view "$TAG" --json url,assets > /tmp/release.json
+          python - <<'PY'
+          import json, pathlib, os, hashlib
+          root = pathlib.Path("artifacts/rook-next")
+          report = json.loads((root / "report.json").read_text())
+          release = json.loads(pathlib.Path("/tmp/release.json").read_text())
+          data = {
+            "status": "exported",
+            "run_id": int(os.environ["GITHUB_RUN_ID"]),
+            "release_url": release["url"],
+            "assets": {a["name"]: a["url"] for a in release["assets"]},
+            "report_step": report.get("step"),
+            "best_step": report.get("best_step"),
+            "config": report.get("config"),
+            "pretrained_weights": False,
+            "external_inference_api": False,
+            "sha256": {n: hashlib.sha256((root/n).read_bytes()).hexdigest() for n in ("best.pt","resume.pt")}
+          }
+          pathlib.Path("rook-status/export.json").write_text(json.dumps(data, indent=2) + "\\n")
+          print(json.dumps(data, indent=2))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rook-status/export.json
+          git commit -m "Record verified Rook checkpoint export"
+          git push
