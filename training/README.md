@@ -38,3 +38,12 @@ A falling loss is necessary but not sufficient. Before any candidate can replace
 ## Resource note
 
 The 14.5M default model should be trained on a compatible GPU. The initial attempt to launch a Hugging Face compute job returned **HTTP 402 Payment Required**, so no remote training job started and no training results are claimed. Use a compute environment with available credits, or reduce model/context/batch size for a pipeline smoke test.
+
+## Autonomous cloud training worker
+
+The `.github/workflows/rook-training.yml` workflow starts a resumable worker on pushes to training code and on an hourly schedule. Each invocation runs for up to 5.5 hours, checkpoints every 25 optimizer steps, evaluates validation loss every 100 steps, and stores the checkpoint plus Hugging Face dataset cache for the next run. Workflow concurrency prevents simultaneous training runs and keeps the latest queued run ready to continue.
+
+The worker keeps the same randomly initialized architecture (384 hidden width, 8 layers, 6 heads, about 14.5M parameters) and uses a 256-byte context and batch size 2 to make CPU training more practical. It does not load pretrained weights or call an external inference API. Progress reports are uploaded as workflow artifacts.
+
+This is a best-effort near-continuous cloud worker, not a guarantee of uninterrupted availability: GitHub may delay scheduled starts, and hosted CPU training is slower than GPU training. A lower validation loss alone does not prove that Rook can hold coherent conversations. The worker must still be evaluated on generated multi-turn dialogues before any model is considered conversationally capable.
+
