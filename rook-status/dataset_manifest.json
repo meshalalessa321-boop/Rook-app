@@ -1,0 +1,11 @@
+{
+  "dataset": "OpenAssistant/oasst1",
+  "license": "CC BY 4.0",
+  "messages": 82952,
+  "roots": 9845,
+  "examples": 51607,
+  "train": 46361,
+  "validation": 2643,
+  "test": 2603,
+  "split_unit": "conversation root"
+}
