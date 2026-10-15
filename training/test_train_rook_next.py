@@ -30,6 +30,22 @@ class PipelineTests(unittest.TestCase):
         x,y=pack(e,128)
         self.assertTrue((y==-100).any());self.assertTrue((y!=-100).any())
         self.assertEqual(x.dtype,torch.long)
+    def test_answer_targets_start_at_prompt_boundary(self):
+        e={"prompt":"User: hello\nAssistant:","answer":" hi there"}
+        x,y=pack(e,128)
+        prompt_len=1+len(e["prompt"].encode("utf-8"))
+        self.assertEqual(int(y[prompt_len-1]), ord(" "))
+        self.assertTrue(torch.all(y[:prompt_len-1] == -100))
+        self.assertLessEqual(len(x),128)
+        self.assertEqual(len(x),len(y))
+
+    def test_long_answer_keeps_prompt_suffix_and_bounded_context(self):
+        e={"prompt":"User: question\nAssistant:","answer":"x"*1000}
+        x,y=pack(e,128)
+        self.assertEqual(len(x),len(y))
+        self.assertLessEqual(len(x),128)
+        self.assertTrue((y!=-100).any())
+
     def test_random_model_forward(self):
         m=Rook(d=48,l=2,h=4,c=32)
         x=torch.randint(0,V,(2,32)); z=m(x)
