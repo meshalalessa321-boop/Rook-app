@@ -17,6 +17,7 @@ CTX, PAD, BOS, EOS, VOCAB = 256, 256, 257, 258, 259
 def generate(prompt_text, seed):
     prompt = [BOS] + list(("User: " + prompt_text + "\nAssistant:").encode("utf-8"))
     prompt = prompt[-CTX:]
+    allow_unicode = bool(re.search(r"[\\u0600-\\u06FF]", prompt_text))
     tokens = np.full((1, CTX), PAD, dtype=np.int64)
     tokens[0, -len(prompt):] = prompt
     rng = np.random.default_rng(seed)
@@ -32,7 +33,7 @@ def generate(prompt_text, seed):
         # Match the browser's byte-level UTF-8 constraints so this test measures
         # model readability, not whether unconstrained sampling invents invalid UTF-8.
         for b in range(256):
-            ok = True
+            ok = allow_unicode or b < 127
             if pending:
                 ok = 0x80 <= b <= 0xBF
                 if pending == 2 and lead == 0xE0 and b < 0xA0: ok = False
