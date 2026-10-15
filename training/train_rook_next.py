@@ -44,8 +44,8 @@ def data(seed):
    if not prompt or not answer: continue
    if len(prompt.encode("utf-8"))>12000 or len(answer.encode("utf-8"))>5000:
     print(f"Skipping oversized user correction on line {line_no}",flush=True);continue
-   if not prompt.endswith("Assistant:"): prompt += "\\nAssistant:"
-   if not answer.endswith("\\n"): answer += "\\n"
+   if not prompt.endswith("Assistant:"): prompt += "\nAssistant:"
+   if not answer.endswith("\n"): answer += "\n"
    train_examples.append({"root":"user-correction","prompt":prompt,"answer":answer})
    correction_count+=1
  meta={"dataset":"OpenAssistant/oasst1","license":"CC BY 4.0","messages":len(rows),"roots":n,"examples":len(ex),"train":sum(e["root"] in tr for e in ex),"validation":sum(e["root"] in va for e in ex),"test":sum(e["root"] in te for e in ex),"personal_corrections":correction_count,"correction_file":correction_path.name,"split_unit":"conversation root; personal corrections train-only"}
