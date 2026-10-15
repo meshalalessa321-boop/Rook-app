@@ -57,7 +57,10 @@ def pack(e,ctx):
  # long answer after accidentally truncating away the entire prompt.
  prompt=[BOS]+list(e["prompt"].encode("utf-8"))
  answer=list(e["answer"].encode("utf-8"))+[EOS]
- max_answer=max(1,ctx-32)
+ # Reserve at least half of the context for the question/conversation.
+ # The old ctx-32 answer cap often left only ~33 prompt bytes, which could
+ # discard almost the entire user's question before training the answer.
+ max_answer=max(16,min(128,ctx//2))
  if len(answer)>max_answer:
   answer=answer[:max_answer-1]+[EOS]
  max_prompt=max(1,ctx+1-len(answer))
