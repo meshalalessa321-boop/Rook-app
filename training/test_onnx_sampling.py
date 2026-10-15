@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Smoke-test real ONNX generation and reject obviously corrupted byte output.
+
+This is a basic corruption guard, not a claim that a reply is semantically good.
+"""
+import re
 import numpy as np
 import onnxruntime as ort
 from pathlib import Path
@@ -5,36 +11,54 @@ from pathlib import Path
 MODEL = Path("models/rook-step-105500.onnx")
 assert MODEL.is_file() and MODEL.stat().st_size > 50_000_000
 session = ort.InferenceSession(str(MODEL), providers=["CPUExecutionProvider"])
-ctx, pad, bos, eos, vocab = 256, 256, 257, 258, 259
-prompt = [bos] + list("User: What is your name?\nAssistant:".encode("utf-8"))
-prompt = prompt[-ctx:]
-tokens = np.full((1, ctx), pad, dtype=np.int64)
-tokens[0, -len(prompt):] = prompt
-rng = np.random.default_rng(2026)
-generated = []
-for step in range(48):
-    logits = session.run(["logits"], {"tokens": tokens})[0][0, -1].astype(np.float64)
-    logits[pad] = -1e9
-    logits[bos] = -1e9
-    if step < 18:
-        logits[eos] = -1e9
-    top = np.argpartition(logits, -48)[-48:]
-    vals = logits[top]
-    probs = np.exp((vals - vals.max()) / 0.9)
-    probs /= probs.sum()
-    nxt = int(rng.choice(top, p=probs))
-    if nxt == eos:
-        break
-    if not 0 <= nxt <= 255:
-        break
-    generated.append(nxt)
-    seq = (prompt + generated)[-ctx:]
-    tokens.fill(pad)
-    tokens[0, -len(seq):] = seq
-text = bytes(generated).decode("utf-8", errors="replace")
-text = "".join(ch for ch in text if ch in "\\n\\t" or ord(ch) >= 32).strip()
-print("PROMPT: What is your name?")
-print("GENERATED TOKENS:", len(generated))
-print("MODEL REPLY SAMPLE:", repr(text))
-assert len(generated) >= 18, "Rook stopped before the minimum generation length"
-assert text, "Rook generated no readable text"
+CTX, PAD, BOS, EOS, VOCAB = 256, 256, 257, 258, 259
+
+
+def generate(prompt_text, seed):
+    prompt = [BOS] + list(("User: " + prompt_text + "\\nAssistant:").encode("utf-8"))
+    prompt = prompt[-CTX:]
+    tokens = np.full((1, CTX), PAD, dtype=np.int64)
+    tokens[0, -len(prompt):] = prompt
+    rng = np.random.default_rng(seed)
+    generated = []
+    for step in range(64):
+        logits = session.run(["logits"], {"tokens": tokens})[0][0, -1].astype(np.float64)
+        logits[PAD] = -1e9
+        logits[BOS] = -1e9
+        if step < 8:
+            logits[EOS] = -1e9
+        top = np.argpartition(logits, -40)[-40:]
+        vals = logits[top]
+        probs = np.exp((vals - vals.max()) / 0.8)
+        probs /= probs.sum()
+        nxt = int(rng.choice(top, p=probs))
+        if nxt == EOS:
+            break
+        if not 0 <= nxt <= 255:
+            break
+        generated.append(nxt)
+        seq = (prompt + generated)[-CTX:]
+        tokens.fill(PAD)
+        tokens[0, -len(seq):] = seq
+    reply = bytes(generated).decode("utf-8", errors="replace")
+    reply = "".join(ch for ch in reply if ch in "\\n\\t" or ord(ch) >= 32).strip()
+    return reply
+
+
+prompts = ["Hi.", "What is your name?", "How are you?"]
+failed = False
+for index, prompt in enumerate(prompts):
+    reply = generate(prompt, 2026 + index)
+    printable = sum(ch.isascii() and (ch.isalnum() or ch.isspace() or ch in ".,!?;:'\"-()") for ch in reply)
+    ratio = printable / max(1, len(reply))
+    words = re.findall(r"[A-Za-z]{2,}", reply)
+    has_replacement = "\\ufffd" in reply
+    passed = len(reply) >= 8 and ratio >= 0.85 and len(words) >= 2 and not has_replacement
+    print(f"PROMPT: {prompt}")
+    print(f"REPLY: {reply!r}")
+    print(f"PRINTABLE_ASCII_RATIO: {ratio:.3f}; WORDLIKE_TOKENS: {len(words)}; PASS_BASIC_READABILITY: {passed}")
+    failed |= not passed
+
+if failed:
+    raise SystemExit("Rook's generated text failed the basic readability guard. Do not treat this model as conversationally verified.")
+print("Basic readability guard passed. Semantic quality still requires human review.")
