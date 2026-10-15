@@ -1,0 +1,26 @@
+{
+  "status": "exported",
+  "run_id": 38807204943,
+  "release_url": "https://github.com/meshalalessa321-boop/Rook-app/releases/tag/rook-checkpoint-38807204943",
+  "assets": {
+    "best.pt": "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/best.pt",
+    "dataset_manifest.json": "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/dataset_manifest.json",
+    "report.json": "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/report.json",
+    "resume.pt": "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/resume.pt"
+  },
+  "report_step": 168143,
+  "best_step": 162900,
+  "config": {
+    "d": 384,
+    "layers": 8,
+    "heads": 6,
+    "ctx": 256,
+    "vocab": 259
+  },
+  "pretrained_weights": false,
+  "external_inference_api": false,
+  "sha256": {
+    "best.pt": "2b0c6e85c03dd479e943a11df5a66de595619e97e4aaf0f8957d452b599423e3",
+    "resume.pt": "3e31b2ab84d6b282841aacc85394dd83d4ab5026912553ddf805728f64e7b71f"
+  }
+}\n
