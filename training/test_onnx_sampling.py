@@ -24,6 +24,8 @@ def generate(prompt_text, seed):
     generated = []
     pending = 0
     lead = 0
+    stop_reason = 'max_tokens'
+    first_step_candidates = []
     for step in range(64):
         logits = session.run(["logits"], {"tokens": tokens})[0][0, -1].astype(np.float64)
         logits[PAD] = -1e9
@@ -46,13 +48,17 @@ def generate(prompt_text, seed):
                 if b in (0xC0, 0xC1) or b >= 0xF5: ok = False
             if not ok: logits[b] = -1e9
         top = np.argpartition(logits, -40)[-40:]
+        if step == 0:
+            first_step_candidates = sorted([(int(i), float(logits[i])) for i in top], key=lambda x: x[1], reverse=True)[:12]
         vals = logits[top]
         probs = np.exp((vals - vals.max()) / 0.8)
         probs /= probs.sum()
         nxt = int(rng.choice(top, p=probs))
         if nxt == EOS:
+            stop_reason = 'EOS'
             break
         if not 0 <= nxt <= 255:
+            stop_reason = f'invalid_special_token:{nxt}'
             break
         generated.append(nxt)
         if pending:
@@ -70,19 +76,21 @@ def generate(prompt_text, seed):
         generated = generated[:-pending]
     reply = bytes(generated).decode("utf-8", errors="strict")
     reply = "".join(ch for ch in reply if ch in "\n\t" or ord(ch) >= 32).strip()
-    return reply
+    return reply, stop_reason, first_step_candidates, generated
 
 
 prompts = ["Hi.", "What is your name?", "How are you?"]
 failed = False
 for index, prompt in enumerate(prompts):
-    reply = generate(prompt, 2026 + index)
+    reply, stop_reason, candidates, token_ids = generate(prompt, 2026 + index)
     printable = sum(ch.isascii() and (ch.isalnum() or ch.isspace() or ch in ".,!?;:'\"-()") for ch in reply)
     ratio = printable / max(1, len(reply))
     words = re.findall(r"[A-Za-z]{2,}", reply)
     has_replacement = "\ufffd" in reply
     passed = len(reply) >= 8 and ratio >= 0.85 and len(words) >= 2 and not has_replacement
     print(f"PROMPT: {prompt}")
+    print(f"STOP_REASON: {stop_reason}; TOKEN_COUNT: {len(token_ids)}; FIRST_STEP_TOP: {candidates}")
+    print(f"TOKEN_IDS: {token_ids[:40]}")
     print(f"REPLY: {reply!r}")
     print(f"PRINTABLE_ASCII_RATIO: {ratio:.3f}; WORDLIKE_TOKENS: {len(words)}; PASS_BASIC_READABILITY: {passed}")
     failed |= not passed
