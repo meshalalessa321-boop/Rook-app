@@ -21,12 +21,29 @@ def generate(prompt_text, seed):
     tokens[0, -len(prompt):] = prompt
     rng = np.random.default_rng(seed)
     generated = []
+    pending = 0
+    lead = 0
     for step in range(64):
         logits = session.run(["logits"], {"tokens": tokens})[0][0, -1].astype(np.float64)
         logits[PAD] = -1e9
         logits[BOS] = -1e9
-        if step < 8:
+        if step < 8 or pending:
             logits[EOS] = -1e9
+        # Match the browser's byte-level UTF-8 constraints so this test measures
+        # model readability, not whether unconstrained sampling invents invalid UTF-8.
+        for b in range(256):
+            ok = True
+            if pending:
+                ok = 0x80 <= b <= 0xBF
+                if pending == 2 and lead == 0xE0 and b < 0xA0: ok = False
+                if pending == 2 and lead == 0xED and b > 0x9F: ok = False
+                if pending == 3 and lead == 0xF0 and b < 0x90: ok = False
+                if pending == 3 and lead == 0xF4 and b > 0x8F: ok = False
+            else:
+                if b < 32 and b not in (9, 10, 13): ok = False
+                if 0x80 <= b <= 0xBF: ok = False
+                if b in (0xC0, 0xC1) or b >= 0xF5: ok = False
+            if not ok: logits[b] = -1e9
         top = np.argpartition(logits, -40)[-40:]
         vals = logits[top]
         probs = np.exp((vals - vals.max()) / 0.8)
@@ -37,10 +54,20 @@ def generate(prompt_text, seed):
         if not 0 <= nxt <= 255:
             break
         generated.append(nxt)
+        if pending:
+            pending -= 1
+        elif 0xC2 <= nxt <= 0xDF:
+            pending, lead = 1, nxt
+        elif 0xE0 <= nxt <= 0xEF:
+            pending, lead = 2, nxt
+        elif 0xF0 <= nxt <= 0xF4:
+            pending, lead = 3, nxt
         seq = (prompt + generated)[-CTX:]
         tokens.fill(PAD)
         tokens[0, -len(seq):] = seq
-    reply = bytes(generated).decode("utf-8", errors="replace")
+    if pending:
+        generated = generated[:-pending]
+    reply = bytes(generated).decode("utf-8", errors="strict")
     reply = "".join(ch for ch in reply if ch in "\n\t" or ord(ch) >= 32).strip()
     return reply
 
