@@ -1,6 +1,11 @@
 name: Rook 24-7 Training Worker
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "training/**"
+      - ".github/workflows/rook-training.yml"
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
@@ -43,11 +48,11 @@ jobs:
 
       - name: Run pipeline tests
         working-directory: training
-        run: python -m unittest -v test_train_rook_next.py
+        run: python -m unittest discover -v
 
       - name: Train Rook and checkpoint progress
         id: train-rook
-        run: python training/rook_worker.py --max-runtime-seconds 20400 --ctx 256 --batch 2 --save-every 25 --eval-every 100
+        run: python training/rook_worker.py --max-runtime-seconds 19800 --ctx 256 --batch 2 --save-every 25 --eval-every 100
 
       - name: Save training state for the next run
         if: always()
