@@ -73,6 +73,7 @@ manifest = {
     "output": {"name": "logits", "dtype": "float32", "shape": [1, cfg["ctx"], cfg["vocab"]]},
     "model_bytes": out.stat().st_size,
     "model_sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
+    "position_scheme": "prefix-right-pad-v2",
     "smoke_test": "passed",
     "greedy_sample_for_prompt_User_Hi": sample,
 }
