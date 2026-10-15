@@ -1,18 +1,22 @@
 name: Verify and publish Rook browser chat model
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/rook-onnx-verified.yml"
-      - "training/export_onnx_verified.py"
+  workflow_run:
+    workflows: ["Rook 24-7 Training Worker"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
+
+concurrency:
+  group: rook-model-publish
+  cancel-in-progress: false
 
 jobs:
   export:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -24,32 +28,44 @@ jobs:
         run: |
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
           python -m pip install onnx onnxruntime numpy
-      - name: Download the saved trained checkpoint
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/rook-next
-          curl -fL --retry 3 \
-            "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/best.pt" \
-            -o artifacts/rook-next/best.pt
-          test -s artifacts/rook-next/best.pt
-      - name: Export ONNX and generate a test reply
-        working-directory: training
-        run: python export_onnx_verified.py
-      - name: Publish the model to the release and Pages
+      - name: Download the checkpoint from the exact training run
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            TRAIN_RUN_ID="${{ github.event.workflow_run.id }}"
+          else
+            TRAIN_RUN_ID="$(gh run list --workflow rook-training.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          fi
+          test -n "$TRAIN_RUN_ID"
+          mkdir -p artifacts/rook-next
+          gh run download "$TRAIN_RUN_ID" --name rook-training-checkpoint --dir artifacts/rook-next
+          test -s artifacts/rook-next/best.pt
+      - name: Export the checkpoint and record its true step
+        working-directory: training
+        run: python export_onnx_verified.py
+      - name: Test candidate model before publishing
+        run: |
+          set -euo pipefail
           mkdir -p models rook-status
           cp artifacts/rook-onnx/model.onnx models/rook-step-105500.onnx
           cp artifacts/rook-onnx/model-manifest.json rook-status/onnx.json
-          gh release upload rook-checkpoint-38807204943 \
-            artifacts/rook-onnx/model.onnx \
-            artifacts/rook-onnx/model-manifest.json \
-            --clobber
-          git add models/rook-step-105500.onnx rook-status/onnx.json
+          python training/test_onnx_sampling.py
+      - name: Publish only if real generated replies pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Publish verified Rook ONNX model for local chat"
+          git add models/rook-step-105500.onnx rook-status/onnx.json
+          if git diff --cached --quiet; then
+            echo "Candidate passed, and published model is unchanged."
+            exit 0
+          fi
+          git commit -m "Publish tested Rook model from latest training checkpoint"
+          git pull --rebase origin main
           git push
