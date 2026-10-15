@@ -71,7 +71,7 @@ def generate(prompt_text, seed):
             pending, lead = 3, nxt
         seq = (prompt + generated)[-CTX:]
         tokens.fill(PAD)
-        tokens[0, -len(seq):] = seq
+        tokens[0, :len(seq)] = seq
     if pending:
         generated = generated[:-pending]
     reply = bytes(generated).decode("utf-8", errors="strict")
