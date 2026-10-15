@@ -74,7 +74,7 @@ def main():
         raise RuntimeError(f"Dataset/split sanity check failed: {meta}")
 
     config = {"d": args.d, "layers": args.layers, "heads": args.heads,
-              "ctx": args.ctx, "vocab": V}
+              "ctx": args.ctx, "vocab": V, "position_scheme": "prefix-right-pad-v2"}
     model = Rook(args.d, args.layers, args.heads, args.ctx).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), weight_decay=0.1)
     step = 0
