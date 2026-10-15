@@ -87,24 +87,32 @@ def generate(prompt_text, seed):
 
 def main():
     prompts = ["Hi.", "What is your name?", "How are you?"]
+    relevance_cues = {
+        "Hi.": {"hi", "hello", "hey", "greetings"},
+        "What is your name?": {"rook", "name", "called"},
+        "How are you?": {"fine", "good", "well", "okay", "ok", "doing", "feeling"},
+    }
     failed = False
     for index, prompt in enumerate(prompts):
         reply, stop_reason, candidates, token_ids = generate(prompt, 2026 + index)
         printable = sum(ch.isascii() and (ch.isalnum() or ch.isspace() or ch in ".,!?;:'\"-()") for ch in reply)
         ratio = printable / max(1, len(reply))
         words = re.findall(r"[A-Za-z]{2,}", reply)
+        normalized = set(re.findall(r"[a-z']+", reply.lower()))
         has_replacement = "\ufffd" in reply
-        passed = len(reply) >= 8 and ratio >= 0.85 and len(words) >= 2 and not has_replacement
+        readable = len(reply) >= 8 and ratio >= 0.85 and len(words) >= 2 and not has_replacement
+        relevant = bool(normalized & relevance_cues[prompt])
+        passed = readable and relevant
         print(f"PROMPT: {prompt}")
         print(f"STOP_REASON: {stop_reason}; TOKEN_COUNT: {len(token_ids)}; FIRST_STEP_TOP: {candidates}")
         print(f"TOKEN_IDS: {token_ids[:40]}")
         print(f"REPLY: {reply!r}")
-        print(f"PRINTABLE_ASCII_RATIO: {ratio:.3f}; WORDLIKE_TOKENS: {len(words)}; PASS_BASIC_READABILITY: {passed}")
+        print(f"PRINTABLE_ASCII_RATIO: {ratio:.3f}; WORDLIKE_TOKENS: {len(words)}; READABLE: {readable}; PROMPT_RELEVANT_CUE: {relevant}; PASS: {passed}")
         failed |= not passed
-    
+
     if failed:
-        raise SystemExit("Rook's generated text failed the basic readability guard. Do not treat this model as conversationally verified.")
-    print("Basic readability guard passed. Semantic quality still requires human review.")
+        raise SystemExit("Rook failed the basic readability or prompt-relevance guard. Do not publish this checkpoint as conversationally verified.")
+    print("Basic readability and simple prompt-relevance guards passed. Human review is still required.")
     
 
 if __name__ == "__main__":
