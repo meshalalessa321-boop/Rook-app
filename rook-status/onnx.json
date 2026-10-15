@@ -1,0 +1,38 @@
+{
+  "format": "ONNX",
+  "source_checkpoint": "best.pt",
+  "training_step": 162900,
+  "validation_loss": 1.4736149384945494,
+  "config": {
+    "d": 384,
+    "layers": 8,
+    "heads": 6,
+    "ctx": 256,
+    "vocab": 259
+  },
+  "parameters": 14394240,
+  "pretrained_weights": false,
+  "external_inference_api": false,
+  "input": {
+    "name": "tokens",
+    "dtype": "int64",
+    "shape": [
+      1,
+      256
+    ]
+  },
+  "output": {
+    "name": "logits",
+    "dtype": "float32",
+    "shape": [
+      1,
+      256,
+      259
+    ]
+  },
+  "model_bytes": 58548974,
+  "model_sha256": "a733b9acfb74218d5c9eb40f000f0b337020a0e973f19cbc51db11bdef0e67fa",
+  "attention_equivalence_max_abs_diff": 7.152557373046875e-06,
+  "smoke_test": "passed",
+  "greedy_sample_for_prompt_User_Hi": ""
+}
