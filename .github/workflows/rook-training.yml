@@ -80,6 +80,17 @@ jobs:
             ~/.cache/huggingface/hub
           key: rook-state-${{ runner.os }}-${{ github.run_id }}
 
+      - name: Upload the exact trained checkpoint for browser export
+        if: success() && hashFiles('artifacts/rook-next/best.pt') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-training-checkpoint
+          path: |
+            artifacts/rook-next/best.pt
+            artifacts/rook-next/report.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload Rook's progress report
         if: always() && hashFiles('artifacts/rook-next/report.json') != ''
         uses: actions/upload-artifact@v4
