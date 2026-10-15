@@ -111,7 +111,7 @@ def main():
   loss.backward();torch.nn.utils.clip_grad_norm_(m.parameters(),1.);opt.step()
   if step==1 or step%100==0 or step==a.steps:
    vl=ev(m,va,dev,a.ctx);r={"step":step,"train_loss":loss.item(),"val_loss":vl,"seconds":round(time.time()-start,1)};hist.append(r);print(json.dumps(r),flush=True)
-   if vl<best:best=vl;torch.save({"model":m.state_dict(),"config":{"d":a.d,"layers":a.layers,"heads":a.heads,"ctx":a.ctx,"vocab":V},"step":step,"val_loss":vl},out/"best.pt")
+   if vl<best:best=vl;torch.save({"model":m.state_dict(),"config":{"d":a.d,"layers":a.layers,"heads":a.heads,"ctx":a.ctx,"vocab":V,"position_scheme":"prefix-right-pad-v2"},"step":step,"val_loss":vl},out/"best.pt")
    torch.save({"model":m.state_dict(),"optimizer":opt.state_dict(),"step":step,"history":hist},out/"resume.pt")
  ck=torch.load(out/"best.pt",map_location=dev,weights_only=False);m.load_state_dict(ck["model"]);report={"architecture":"random-init byte Transformer","parameters":params,"pretrained_weights":False,"external_inference_api":False,"data":meta,"best_step":ck["step"],"best_validation_loss":ck["val_loss"],"heldout_test_loss":ev(m,te,dev,a.ctx),"history":hist,"elapsed_seconds":round(time.time()-start,1),"device":dev}
  (out/"report.json").write_text(json.dumps(report,indent=2));print("FINAL_REPORT "+json.dumps(report),flush=True)
