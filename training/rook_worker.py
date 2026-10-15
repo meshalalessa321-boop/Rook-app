@@ -130,8 +130,8 @@ def main():
         xs, ys = [], []
         for _ in range(args.batch):
             x, y = pack(random.choice(train), args.ctx)
-            xs.append(F.pad(x, (args.ctx - len(x), 0), value=PAD))
-            ys.append(F.pad(y, (args.ctx - len(y), 0), value=-100))
+            xs.append(F.pad(x, (0, args.ctx - len(x)), value=PAD))
+            ys.append(F.pad(y, (0, args.ctx - len(y)), value=-100))
         x = torch.stack(xs).to(device)
         y = torch.stack(ys).to(device)
         optimizer.zero_grad(set_to_none=True)
