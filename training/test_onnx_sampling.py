@@ -86,11 +86,21 @@ def generate(prompt_text, seed):
 
 
 def main():
-    prompts = ["Hi.", "What is your name?", "How are you?"]
+    prompts = [
+        "Hi.",
+        "What is your name?",
+        "How are you?",
+        'What does "~" mean?',
+        "What are you?",
+        "What is 2 + 2?",
+    ]
     relevance_cues = {
         "Hi.": {"hi", "hello", "hey", "greetings"},
         "What is your name?": {"rook", "name", "called"},
         "How are you?": {"fine", "good", "well", "okay", "ok", "doing", "feeling"},
+        'What does "~" mean?': {"tilde", "approximately", "symbol"},
+        "What are you?": {"rook", "model", "assistant", "program", "ai"},
+        "What is 2 + 2?": {"4", "four"},
     }
     failed = False
     for index, prompt in enumerate(prompts):
