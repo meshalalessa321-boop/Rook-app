@@ -1,0 +1,55 @@
+name: Export Rook for local browser chat
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rook-onnx-manual.yml"
+      - "training/export_onnx_manual.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU export tools
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install onnx onnxruntime numpy
+      - name: Download the verified Rook checkpoint
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/rook-next
+          curl -fL --retry 3 \
+            "https://github.com/meshalalessa321-boop/Rook-app/releases/download/rook-checkpoint-38807204943/best.pt" \
+            -o artifacts/rook-next/best.pt
+          test -s artifacts/rook-next/best.pt
+      - name: Export and test ONNX inference
+        working-directory: training
+        run: python export_onnx_manual.py
+      - name: Publish the model for the chat page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p models rook-status
+          cp artifacts/rook-onnx/model.onnx models/rook-step-105500.onnx
+          cp artifacts/rook-onnx/model-manifest.json rook-status/onnx.json
+          gh release upload rook-checkpoint-38807204943 \
+            artifacts/rook-onnx/model.onnx \
+            artifacts/rook-onnx/model-manifest.json \
+            --clobber
+          git add models/rook-step-105500.onnx rook-status/onnx.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish verified Rook model for local chat"
+          git push
