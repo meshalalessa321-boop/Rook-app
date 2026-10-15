@@ -50,11 +50,11 @@ def generate(prompt_text, seed):
                 if 0x80 <= b <= 0xBF: ok = False
                 if b in (0xC0, 0xC1) or b >= 0xF5: ok = False
             if not ok: logits[b] = -1e9
-        top = np.argpartition(logits, -40)[-40:]
+        top = np.argpartition(logits, -32)[-32:]
         if step == 0:
             first_step_candidates = sorted([(int(i), float(logits[i])) for i in top], key=lambda x: x[1], reverse=True)[:12]
         vals = logits[top]
-        probs = np.exp((vals - vals.max()) / 0.8)
+        probs = np.exp((vals - vals.max()) / 0.72)
         probs /= probs.sum()
         nxt = int(rng.choice(top, p=probs))
         if nxt == EOS:
