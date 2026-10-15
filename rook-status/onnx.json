@@ -32,7 +32,11 @@
   },
   "model_bytes": 58548974,
   "model_sha256": "a733b9acfb74218d5c9eb40f000f0b337020a0e973f19cbc51db11bdef0e67fa",
-  "attention_equivalence_max_abs_diff": 7.152557373046875e-06,
+  "attention_equivalence_max_abs_diff": 0.000007152557373046875,
   "smoke_test": "passed",
-  "greedy_sample_for_prompt_User_Hi": ""
+  "greedy_sample_for_prompt_User_Hi": "",
+  "position_scheme": "prefix-right-pad-v2",
+  "training_position_scheme": "left-padded-v1",
+  "inference_alignment_experimental": true,
+  "note": "The published weights predate the prefix-aligned training correction. Prefix-right-padded inference produced readable but not yet semantically verified samples; this manifest flag enables the matching browser inference path. A freshly trained checkpoint is required to fully align training and inference."
 }
