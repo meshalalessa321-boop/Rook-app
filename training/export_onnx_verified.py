@@ -18,6 +18,7 @@ out_dir.mkdir(parents=True, exist_ok=True)
 checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 cfg = checkpoint["config"]
 assert cfg["vocab"] == 259 and cfg["ctx"] == 256
+assert cfg.get("position_scheme") == "prefix-right-pad-v2", "Refusing to export a checkpoint trained with incompatible token positions."
 model = Rook(cfg["d"], cfg["layers"], cfg["heads"], cfg["ctx"])
 model.load_state_dict(checkpoint["model"])
 model.eval()
