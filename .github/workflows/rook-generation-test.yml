@@ -1,0 +1,23 @@
+name: Test Rook sampled replies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rook-generation-test.yml"
+      - "training/test_onnx_sampling.py"
+  workflow_dispatch:
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ONNX Runtime
+        run: python -m pip install numpy onnxruntime
+      - name: Generate a real sample from Rook's weights
+        run: python training/test_onnx_sampling.py
