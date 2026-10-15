@@ -1,0 +1,78 @@
+name: Export Rook trained checkpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rook-export.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+# Wait for the active training worker so its newest cache is available.
+concurrency:
+  group: rook-training-worker
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out Rook
+        uses: actions/checkout@v4
+
+      - name: Restore the latest Rook training state
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            artifacts/rook-next
+            ~/.cache/huggingface/datasets
+            ~/.cache/huggingface/hub
+          key: rook-state-${{ runner.os }}-export-${{ github.run_id }}
+          restore-keys: |
+            rook-state-${{ runner.os }}-
+
+      - name: Verify trained checkpoint exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/rook-next/resume.pt
+          test -s artifacts/rook-next/best.pt
+          test -s artifacts/rook-next/report.json
+          python - <<'PY'
+          import json, pathlib, torch
+          root = pathlib.Path("artifacts/rook-next")
+          report = json.loads((root / "report.json").read_text())
+          assert report.get("pretrained_weights") is False, report
+          assert report.get("external_inference_api") is False, report
+          resume = torch.load(root / "resume.pt", map_location="cpu", weights_only=False)
+          best = torch.load(root / "best.pt", map_location="cpu", weights_only=False)
+          assert resume.get("config") == best.get("config")
+          assert int(resume.get("step", 0)) >= int(best.get("step", 0))
+          print(json.dumps({
+              "report_step": report.get("step"),
+              "resume_step": resume.get("step"),
+              "best_step": best.get("step"),
+              "config": resume.get("config"),
+              "resume_bytes": (root / "resume.pt").stat().st_size,
+              "best_bytes": (root / "best.pt").stat().st_size,
+              "pretrained_weights": False,
+              "external_inference_api": False
+          }, indent=2))
+          PY
+
+      - name: Upload actual trained weights
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-trained-checkpoint-${{ github.run_number }}
+          path: |
+            artifacts/rook-next/resume.pt
+            artifacts/rook-next/best.pt
+            artifacts/rook-next/report.json
+            artifacts/rook-next/dataset_manifest.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
