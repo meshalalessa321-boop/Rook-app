@@ -46,7 +46,10 @@ tokens = np.full((1, cfg["ctx"]), PAD, dtype=np.int64)
 tokens[0, :len(prompt)] = prompt
 generated = []
 for _ in range(24):
-    scores = session.run(["logits"], {"tokens": tokens})[0][0, len(prompt) + len(generated) - 1]
+    seq = (prompt + generated)[-cfg["ctx"]:]
+    tokens.fill(PAD)
+    tokens[0, :len(seq)] = seq
+    scores = session.run(["logits"], {"tokens": tokens})[0][0, len(seq) - 1]
     scores[PAD] = -1e9
     scores[257] = -1e9
     nxt = int(np.argmax(scores))
@@ -54,9 +57,6 @@ for _ in range(24):
         break
     if 0 <= nxt <= 255:
         generated.append(nxt)
-        seq = (prompt + generated)[-cfg["ctx"]:]
-        tokens.fill(PAD)
-        tokens[0, :len(seq)] = seq
     else:
         break
 sample = bytes(generated).decode("utf-8", errors="replace")
