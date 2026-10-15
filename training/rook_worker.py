@@ -69,6 +69,7 @@ def main():
     report_path = out / "report.json"
 
     train, valid, test, meta = data(1701)
+    atomic_json_save(meta, out / "dataset_manifest.json")
     if len(train) <= 1000 or len(valid) <= 20 or len(test) <= 20:
         raise RuntimeError(f"Dataset/split sanity check failed: {meta}")
 
