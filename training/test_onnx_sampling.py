@@ -15,7 +15,7 @@ CTX, PAD, BOS, EOS, VOCAB = 256, 256, 257, 258, 259
 
 
 def generate(prompt_text, seed):
-    prompt = [BOS] + list(("User: " + prompt_text + "\\nAssistant:").encode("utf-8"))
+    prompt = [BOS] + list(("User: " + prompt_text + "\nAssistant:").encode("utf-8"))
     prompt = prompt[-CTX:]
     tokens = np.full((1, CTX), PAD, dtype=np.int64)
     tokens[0, -len(prompt):] = prompt
@@ -41,7 +41,7 @@ def generate(prompt_text, seed):
         tokens.fill(PAD)
         tokens[0, -len(seq):] = seq
     reply = bytes(generated).decode("utf-8", errors="replace")
-    reply = "".join(ch for ch in reply if ch in "\\n\\t" or ord(ch) >= 32).strip()
+    reply = "".join(ch for ch in reply if ch in "\n\t" or ord(ch) >= 32).strip()
     return reply
 
 
@@ -52,7 +52,7 @@ for index, prompt in enumerate(prompts):
     printable = sum(ch.isascii() and (ch.isalnum() or ch.isspace() or ch in ".,!?;:'\"-()") for ch in reply)
     ratio = printable / max(1, len(reply))
     words = re.findall(r"[A-Za-z]{2,}", reply)
-    has_replacement = "\\ufffd" in reply
+    has_replacement = "\ufffd" in reply
     passed = len(reply) >= 8 and ratio >= 0.85 and len(words) >= 2 and not has_replacement
     print(f"PROMPT: {prompt}")
     print(f"REPLY: {reply!r}")
