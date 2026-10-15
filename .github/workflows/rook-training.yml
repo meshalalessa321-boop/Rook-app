@@ -39,9 +39,9 @@ jobs:
             artifacts/rook-next
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-state-${{ runner.os }}-${{ github.run_id }}
+          key: rook-state-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            rook-state-${{ runner.os }}-
+            rook-state-v2-${{ runner.os }}-
 
       - name: Install training dependencies
         run: python -m pip install -r training/requirements.txt
@@ -78,7 +78,7 @@ jobs:
             artifacts/rook-next
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-state-${{ runner.os }}-${{ github.run_id }}
+          key: rook-state-v2-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload the exact trained checkpoint for browser export
         if: success() && hashFiles('artifacts/rook-next/best.pt') != ''
