@@ -17,7 +17,7 @@ CTX, PAD, BOS, EOS, VOCAB = 256, 256, 257, 258, 259
 def generate(prompt_text, seed):
     prompt = [BOS] + list(("User: " + prompt_text + "\nAssistant:").encode("utf-8"))
     prompt = prompt[-CTX:]
-    allow_unicode = bool(re.search(r"[\\u0600-\\u06FF]", prompt_text))
+    allow_unicode = bool(re.search(r"[\u0600-\u06FF]", prompt_text))
     tokens = np.full((1, CTX), PAD, dtype=np.int64)
     tokens[0, -len(prompt):] = prompt
     rng = np.random.default_rng(seed)
