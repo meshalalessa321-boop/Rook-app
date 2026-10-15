@@ -39,12 +39,18 @@ class PipelineTests(unittest.TestCase):
         self.assertLessEqual(len(x),128)
         self.assertEqual(len(x),len(y))
 
-    def test_long_answer_keeps_prompt_suffix_and_bounded_context(self):
-        e={"prompt":"User: question\nAssistant:","answer":"x"*1000}
+    def test_long_answer_reserves_half_context_for_prompt(self):
+        e={"prompt":"User: " + "question detail " * 20 + "\nAssistant:","answer":"x"*1000}
         x,y=pack(e,128)
         self.assertEqual(len(x),len(y))
         self.assertLessEqual(len(x),128)
+        # A long answer must not crowd the question down to only a few bytes.
+        self.assertEqual(int((y != -100).sum()), 64)
+        self.assertEqual(int((y == -100).sum()), 64)
         self.assertTrue((y!=-100).any())
+        prompt_and_answer = bytes(x.tolist()[1:]).decode("utf-8", errors="ignore")
+        self.assertIn("Assistant:", prompt_and_answer)
+        self.assertIn("question", prompt_and_answer)
 
     def test_random_model_forward(self):
         m=Rook(d=48,l=2,h=4,c=32)
