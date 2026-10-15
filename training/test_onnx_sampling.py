@@ -27,7 +27,10 @@ def generate(prompt_text, seed):
     stop_reason = 'max_tokens'
     first_step_candidates = []
     for step in range(64):
-        seq = (prompt + generated)[-CTX:]\n        tokens.fill(PAD)\n        tokens[0, :len(seq)] = seq\n        logits = session.run(["logits"], {"tokens": tokens})[0][0, len(seq) - 1].astype(np.float64)
+        seq = (prompt + generated)[-CTX:]
+        tokens.fill(PAD)
+        tokens[0, :len(seq)] = seq
+        logits = session.run(["logits"], {"tokens": tokens})[0][0, len(seq) - 1].astype(np.float64)
         logits[PAD] = -1e9
         logits[BOS] = -1e9
         if step < 8 or pending:
