@@ -27,7 +27,7 @@ def data(seed):
     if len(p.encode())<12000 and 1<len(a.encode())<5000:ex.append({"root":root,"prompt":p,"answer":a})
    nxt=path+[r]
    for c in reversed(kids.get(node,[])):stack.append((c,nxt))
- rng=random.Random(seed); roots=list({e["root"] for e in ex});rng.shuffle(roots);n=len(roots)
+ rng=random.Random(seed); roots=sorted({e["root"] for e in ex});rng.shuffle(roots);n=len(roots)
  tr=set(roots[:int(.9*n)]);va=set(roots[int(.9*n):int(.95*n)]);te=set(roots[int(.95*n):])
  split=lambda s:[e for e in ex if e["root"] in s]
  return split(tr),split(va),split(te),{"dataset":"OpenAssistant/oasst1","license":"CC BY 4.0","messages":len(rows),"roots":n,"examples":len(ex),"train":sum(e["root"] in tr for e in ex),"validation":sum(e["root"] in va for e in ex),"test":sum(e["root"] in te for e in ex),"split_unit":"conversation root"}
