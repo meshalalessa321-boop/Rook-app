@@ -7,5 +7,7 @@
   "train": 46361,
   "validation": 2643,
   "test": 2603,
-  "split_unit": "conversation root"
+  "personal_corrections": 0,
+  "correction_file": "user_corrections.jsonl",
+  "split_unit": "conversation root; personal corrections train-only"
 }
