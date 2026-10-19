@@ -27,6 +27,10 @@ for p in model.parameters():
 
 dummy = torch.full((1, cfg["ctx"]), PAD, dtype=torch.long)
 out = out_dir / "model.onnx"
+# Disable PyTorch's fused MHA fast path during export. Otherwise recent PyTorch
+# versions emit aten::_native_multi_head_attention, which the ONNX exporter
+# cannot lower to opset 17. This changes export tracing only, not model weights.
+torch.backends.mha.set_fastpath_enabled(False)
 with torch.no_grad():
     torch.onnx.export(
         model, (dummy,), str(out),
