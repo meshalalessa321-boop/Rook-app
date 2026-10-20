@@ -18,12 +18,13 @@ MANIFEST = CORPUS / "manifest.jsonl"
 DATASET_ID = "Salesforce/wikitext"
 CONFIG = "wikitext-103-v1"
 DATASET_URL = "https://huggingface.co/datasets/Salesforce/wikitext"
-LICENSE = "CC BY-SA 3.0 (Wikipedia-derived source; verify dataset card before redistribution)"
+LICENSE = "CC BY-SA 3.0"
 HEADING = re.compile(r"^= ([^=].*?) =$")
 
 
 def main():
     print(f"Loading {DATASET_ID} / {CONFIG} train split...", flush=True)
+    print("Source license: CC BY-SA 3.0 (Wikipedia-derived text); confirm the dataset card before redistributing source text.", flush=True)
     dataset = load_dataset(DATASET_ID, CONFIG, split="train")
     TEXTS.mkdir(parents=True, exist_ok=True)
     for old in TEXTS.glob("*.txt"):
