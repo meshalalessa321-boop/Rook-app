@@ -1,24 +1,23 @@
 name: Rook 24-7 Training Worker
 
 on:
+  # Training is intentionally paused while the objective is redesigned.
+  # Re-enable only after the replacement corpus and objective are implemented and tested.
   push:
     branches: [main]
     paths:
-      - "training/**"
       - ".github/workflows/rook-training.yml"
-  schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
   group: rook-training-worker
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   train:
+    if: ${{ false }} # Intentionally disabled: do not continue the retired assistant-response objective.
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
