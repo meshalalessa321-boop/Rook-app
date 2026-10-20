@@ -170,6 +170,10 @@ def main():
         model.load_state_dict(saved["model"])
         if "optimizer" in saved:
             optimizer.load_state_dict(saved["optimizer"])
+        if "python_rng" in saved:
+            random.setstate(saved["python_rng"])
+        if "torch_rng" in saved:
+            torch.set_rng_state(saved["torch_rng"].cpu())
         start_step = int(saved.get("step", 0))
         best = float(saved.get("best_validation_loss", float("inf")))
         print(json.dumps({"event":"resumed","step":start_step,"best_validation_loss":best,"corpus_fingerprint":corpus_fingerprint}), flush=True)
@@ -207,6 +211,7 @@ def main():
             torch.save({"model":model.state_dict(),"optimizer":optimizer.state_dict(),"step":step,
                         "best_validation_loss":best,"config":report["config"],
                         "corpus_fingerprint":corpus_fingerprint,
+                        "python_rng":random.getstate(),"torch_rng":torch.get_rng_state(),
                         "objective":report["objective"]}, resume_path)
     ck = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(ck["model"])
