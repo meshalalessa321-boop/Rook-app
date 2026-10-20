@@ -165,8 +165,11 @@ def main():
         saved = torch.load(resume_path, map_location=device, weights_only=False)
         if saved.get("config") != config:
             raise SystemExit("Saved checkpoint configuration differs. Use --fresh to intentionally start a new model.")
-        if saved.get("corpus_fingerprint") != corpus_fingerprint:
+        saved_fingerprint = saved.get("corpus_fingerprint")
+        if saved_fingerprint and saved_fingerprint != corpus_fingerprint:
             raise SystemExit("Corpus changed since the saved checkpoint. Review the new corpus, then use --fresh for a new run.")
+        if not saved_fingerprint and saved.get("objective") != "full-sequence next-token prediction":
+            raise SystemExit("Saved checkpoint lacks verified full-sequence objective metadata; refusing to resume it.")
         model.load_state_dict(saved["model"])
         if "optimizer" in saved:
             optimizer.load_state_dict(saved["optimizer"])
@@ -175,8 +178,12 @@ def main():
         if "torch_rng" in saved:
             torch.set_rng_state(saved["torch_rng"].cpu())
         start_step = int(saved.get("step", 0))
-        best = float(saved.get("best_validation_loss", float("inf")))
-        print(json.dumps({"event":"resumed","step":start_step,"best_validation_loss":best,"corpus_fingerprint":corpus_fingerprint}), flush=True)
+        if "best_validation_loss" in saved:
+            best = float(saved["best_validation_loss"])
+        elif best_path.exists():
+            previous_best = torch.load(best_path, map_location="cpu", weights_only=False)
+            best = float(previous_best.get("val_loss", float("inf")))
+        print(json.dumps({"event":"resumed","step":start_step,"best_validation_loss":best,"corpus_fingerprint":corpus_fingerprint,"legacy_checkpoint_metadata":not bool(saved_fingerprint)}), flush=True)
     else:
         print(json.dumps({"event":"fresh_initialization","pretrained_weights":False,"corpus_fingerprint":corpus_fingerprint}), flush=True)
     start = time.time()
