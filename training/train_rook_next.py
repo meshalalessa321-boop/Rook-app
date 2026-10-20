@@ -96,7 +96,8 @@ def ev(m,ex,dev,c,limit=500):
    n+=y.ne(-100).sum().item()
  return s/max(1,n)
 def main():
- p=argparse.ArgumentParser();p.add_argument("--steps",type=int,default=5000);p.add_argument("--d",type=int,default=384);p.add_argument("--layers",type=int,default=8);p.add_argument("--heads",type=int,default=6);p.add_argument("--ctx",type=int,default=512);p.add_argument("--batch",type=int,default=8);p.add_argument("--smoke",action="store_true");a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument("--steps",type=int,default=5000);p.add_argument("--d",type=int,default=384);p.add_argument("--layers",type=int,default=8);p.add_argument("--heads",type=int,default=6);p.add_argument("--ctx",type=int,default=512);p.add_argument("--batch",type=int,default=8);p.add_argument("--smoke",action="store_true");p.add_argument("--allow-legacy-assistant-objective",action="store_true",help="Explicitly opt into the retired assistant-response objective.");a=p.parse_args()
+ if not a.allow_legacy_assistant_objective: raise SystemExit("Training paused: this script trains only assistant-response bytes from OpenAssistant. That objective conflicts with Rook's intended direction. Use the new full-sequence pretraining pipeline once it is implemented; do not resume this legacy path.")
  random.seed(1701);torch.manual_seed(1701);dev="cuda" if torch.cuda.is_available() else "cpu";torch.set_num_threads(8)
  tr,va,te,meta=data(1701);out=Path("artifacts/rook-next");out.mkdir(parents=True,exist_ok=True);(out/"dataset_manifest.json").write_text(json.dumps(meta,indent=2))
  if a.smoke:a.d,a.layers,a.heads,a.ctx,a.batch=192,4,6,128,2
