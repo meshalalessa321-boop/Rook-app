@@ -154,7 +154,7 @@ def main():
     start = time.time()
     report = {"architecture": "random-init byte Transformer", "pretrained_weights": False,
               "external_inference_api": False, "objective": "full-sequence next-token prediction",
-              "speaker_role_objective": False, "config": {"d":d,"layers":layers,"heads":heads,"ctx":ctx,"vocab":V},
+              "speaker_role_objective": False, "config": {"d":d,"layers":layers,"heads":heads,"ctx":ctx,"vocab":V,"position_scheme":"prefix-right-pad-v2"},
               "parameters": sum(q.numel() for q in model.parameters()), "corpus": manifest}
     (OUT / "dataset_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     for step in range(1, steps+1):
