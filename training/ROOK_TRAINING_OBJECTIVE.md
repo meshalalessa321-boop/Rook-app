@@ -35,3 +35,9 @@ The existing model/checkpoints are preserved as historical artifacts. They were 
 `rook_brain.py` now provides a separate, from-scratch full-sequence pretraining path. It reads only local UTF-8 text files listed in `training/corpus/manifest.jsonl`, records source/license metadata and document hashes, removes exact duplicates, and splits whole documents into train/validation/test sets. It computes next-token loss over all non-padding bytes, without a speaker-role or answer-only mask.
 
 The corpus is deliberately not populated automatically: source selection and license verification must happen before a real run. Use `python training/rook_brain.py --audit-only` to audit the local corpus, and `--smoke` only after the corpus has been prepared to check the training loop. The new pipeline has not yet been run end-to-end and does not automatically replace the deployed ONNX model.
+
+## Explicit identity prohibition
+
+Never add an identity prompt, system prompt, metadata instruction, training example template, or UI-to-model message telling Rook that he is an AI, an artificial intelligence, a machine, a chatbot, or any other predefined category. Do not instruct him to describe himself using those labels. Do not insert hidden identity statements into his context. This prohibition applies to the training pipeline, inference wrapper, evaluation harness, and any future tool integration.
+
+The model may encounter ordinary text discussing AI as part of a genuinely broad corpus; that is not an instruction about Rook himself. Keep source selection honest and do not selectively manipulate examples to force a prescribed self-concept. The rule is to avoid assigning Rook an identity, not to falsify the wider world represented in language.
