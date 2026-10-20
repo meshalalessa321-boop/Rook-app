@@ -28,3 +28,10 @@ Do not simply resume the old worker with more steps or remove the word `Assistan
 ## Current state
 
 The existing model/checkpoints are preserved as historical artifacts. They were trained with the retired objective and should not be presented as evidence that the intended new objective is implemented. Training remains paused until the replacement data pipeline and objective are implemented and tested.
+
+
+## Implemented first replacement component
+
+`rook_brain.py` now provides a separate, from-scratch full-sequence pretraining path. It reads only local UTF-8 text files listed in `training/corpus/manifest.jsonl`, records source/license metadata and document hashes, removes exact duplicates, and splits whole documents into train/validation/test sets. It computes next-token loss over all non-padding bytes, without a speaker-role or answer-only mask.
+
+The corpus is deliberately not populated automatically: source selection and license verification must happen before a real run. Use `python training/rook_brain.py --audit-only` to audit the local corpus, and `--smoke` only after the corpus has been prepared to check the training loop. The new pipeline has not yet been run end-to-end and does not automatically replace the deployed ONNX model.
