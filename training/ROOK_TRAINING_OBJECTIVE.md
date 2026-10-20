@@ -27,7 +27,7 @@ Do not simply resume the old worker with more steps or remove the word `Assistan
 
 ## Current state
 
-The existing model/checkpoints are preserved as historical artifacts. They were trained with the retired objective and should not be presented as evidence that the intended new objective is implemented. Training remains paused until the replacement data pipeline and objective are implemented and tested.
+The existing model/checkpoints from the old assistant-response objective are preserved as historical artifacts and are not resumed by the new pipeline. The new `rook_brain.py` pipeline and daily GitHub Actions workflow are now implemented. The workflow uses a documented WikiText-103 bootstrap corpus, runs tests and an audit, and trains with full-sequence next-token prediction while resuming only checkpoints with a matching configuration and corpus fingerprint. The first successful run and its evaluation report are still required before claiming the training is operating correctly. This initial English encyclopedia corpus is a starting point, not a complete or diverse conversational corpus.
 
 
 ## Implemented first replacement component
