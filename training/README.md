@@ -1,49 +1,22 @@
-# Rook Next training experiment
+# Rook training status
 
-This is a **new research branch**, not the deployed Rook model. It does not replace the current app or load its weights.
+**Training is paused while the objective is redesigned.** Do not launch the previous worker or training script as a normal training run.
 
-## Why this branch exists
+Read [ROOK_TRAINING_OBJECTIVE.md](ROOK_TRAINING_OBJECTIVE.md) before changing the pipeline.
 
-The existing Rook dialogue corpus contains only a few hundred supervised response turns. Repeating optimizer steps over it was not a credible route to conversational ability. This experiment instead builds examples from the public OpenAssistant conversation tree, splits by conversation root to prevent related turns crossing splits, and evaluates on held-out validation and test roots.
+## Why the old experiment is retired
 
-## Model
+The previous experiment used OpenAssistant conversation trees, formatted examples as `User: ...\nAssistant:`, and computed loss only over assistant-response bytes. This directly optimizes a designated assistant role, which conflicts with Meshal's project constraints. The old checkpoints are preserved as historical artifacts, not as the intended final direction.
 
-- Decoder-only Transformer initialized from random weights.
-- Default size: 384 hidden width, 8 layers, 6 attention heads, 512-byte context, approximately 14.5 million parameters.
-- Byte-level encoding avoids training a tokenizer on the same small corpus.
-- Only assistant-response bytes are included in the supervised loss; prompt bytes are masked.
-- No pretrained weights and no external inference API.
-- Dataset source: `OpenAssistant/oasst1`, licensed CC BY 4.0. Preserve attribution and review the source dataset's terms before redistributing derived data.
+The old script and worker now require an explicit `--allow-legacy-assistant-objective` opt-in. The scheduled GitHub Actions training workflow is disabled, so it cannot keep extending the retired objective in the background.
 
-## Reproducible commands
+## Replacement requirements
 
-Install PyTorch and Hugging Face Datasets, then run:
+- Start model parameters from random initialization. Do not load pretrained weights.
+- Use full-sequence next-token prediction, not a loss mask that privileges a responder role.
+- Build a broader, documented and appropriately licensed text mixture; conversation should be one source among many, not an assistant-only foundation.
+- Do not inject a hidden identity prompt, prescribed personality, worldview, beliefs, opinions, emotions, or canned responses.
+- Track source licenses, deduplication, language distribution, and held-out splits.
+- Evaluate general text continuation, context coherence, language drift, and multi-turn continuity without using “assistant helpfulness” as the target identity.
 
-```bash
-python training/train_rook_next.py --steps 5000
-```
-
-The run saves `artifacts/rook-next/dataset_manifest.json`, best checkpoint, resumable checkpoint, and `report.json`. The final test loss is computed after selecting the checkpoint by validation loss.
-
-Unit tests (from the training directory):
-
-```bash
-python -m unittest test_train_rook_next.py
-```
-
-## Promotion gate
-
-A falling loss is necessary but not sufficient. Before any candidate can replace the live app, evaluate generated conversations on a fixed unseen prompt set for relevance across turns, repetition, instruction-following, and context retention. Inspect actual generations manually. Do not promote a model solely because its loss improves.
-
-## Resource note
-
-The 14.5M default model should be trained on a compatible GPU. The initial attempt to launch a Hugging Face compute job returned **HTTP 402 Payment Required**, so no remote training job started and no training results are claimed. Use a compute environment with available credits, or reduce model/context/batch size for a pipeline smoke test.
-
-## Autonomous cloud training worker
-
-The `.github/workflows/rook-training.yml` workflow starts a resumable worker on pushes to training code and on an hourly schedule. Each invocation runs for up to 5.5 hours, checkpoints every 25 optimizer steps, evaluates validation loss every 100 steps, and stores the checkpoint plus Hugging Face dataset cache for the next run. Workflow concurrency prevents simultaneous training runs and keeps the latest queued run ready to continue.
-
-The worker keeps the same randomly initialized architecture (384 hidden width, 8 layers, 6 heads, about 14.5M parameters) and uses a 256-byte context and batch size 2 to make CPU training more practical. It does not load pretrained weights or call an external inference API. Progress reports are uploaded as workflow artifacts.
-
-This is a best-effort near-continuous cloud worker, not a guarantee of uninterrupted availability: GitHub may delay scheduled starts, and hosted CPU training is slower than GPU training. A lower validation loss alone does not prove that Rook can hold coherent conversations. The worker must still be evaluated on generated multi-turn dialogues before any model is considered conversationally capable.
-
+The replacement data pipeline and training script have **not yet been implemented**. Do not represent this pause or the old checkpoint as completion of that work.
