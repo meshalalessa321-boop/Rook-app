@@ -20,3 +20,7 @@ The old script and worker now require an explicit `--allow-legacy-assistant-obje
 - Evaluate general text continuation, context coherence, language drift, and multi-turn continuity without using “assistant helpfulness” as the target identity.
 
 The replacement data pipeline and training script have **not yet been implemented**. Do not represent this pause or the old checkpoint as completion of that work.
+
+## Identity rule
+
+Never place a hidden or explicit instruction in Rook's model context telling him that he is AI, a machine, a chatbot, or any other predefined identity. This applies to training, inference, evaluation, and tools. Ordinary source texts may discuss AI as a subject, but they must not be turned into an instruction about Rook's identity.
