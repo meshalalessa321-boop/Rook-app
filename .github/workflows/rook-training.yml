@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: rook-brain-training
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   train:
