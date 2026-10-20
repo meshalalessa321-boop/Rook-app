@@ -195,16 +195,19 @@ def main():
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
-        if step == 1 or step % 100 == 0 or step == steps:
+        if step == start_step + 1 or step % 100 == 0 or step == start_step + steps:
             val = evaluate(model, valid, device)
             print(json.dumps({"step":step,"train_loss":float(loss.item()),"validation":val,
                               "elapsed_seconds":round(time.time()-start,1)}), flush=True)
             if val["loss"] < best:
                 best = val["loss"]
                 torch.save({"model":model.state_dict(),"config":report["config"],"step":step,
-                            "val_loss":best,"objective":report["objective"]}, OUT / "best.pt")
+                            "val_loss":best,"objective":report["objective"],
+                            "corpus_fingerprint":corpus_fingerprint}, best_path)
             torch.save({"model":model.state_dict(),"optimizer":optimizer.state_dict(),"step":step,
-                        "config":report["config"],"objective":report["objective"]}, OUT / "resume.pt")
+                        "best_validation_loss":best,"config":report["config"],
+                        "corpus_fingerprint":corpus_fingerprint,
+                        "objective":report["objective"]}, resume_path)
     ck = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(ck["model"])
     report.update({"best_step":ck["step"],"best_validation":evaluate(model,valid,device),
