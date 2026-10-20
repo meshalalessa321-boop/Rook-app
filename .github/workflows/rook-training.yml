@@ -1,23 +1,28 @@
-name: Rook 24-7 Training Worker
+name: Rook Brain Training
 
 on:
-  # Training is intentionally paused while the objective is redesigned.
-  # Re-enable only after the replacement corpus and objective are implemented and tested.
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
   push:
     branches: [main]
     paths:
       - ".github/workflows/rook-training.yml"
+      - "training/rook_brain.py"
+      - "training/prepare_wikitext.py"
+      - "training/test_rook_brain.py"
+      - "training/requirements.txt"
+      - "training/corpus/**"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: rook-training-worker
-  cancel-in-progress: true
+  group: rook-brain-training
+  cancel-in-progress: false
 
 jobs:
   train:
-    if: ${{ false }} # Intentionally disabled: do not continue the retired assistant-response objective.
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
@@ -31,72 +36,59 @@ jobs:
           cache: pip
           cache-dependency-path: training/requirements.txt
 
-      - name: Restore latest training state and dataset cache
+      - name: Restore Rook Brain checkpoints and dataset cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            artifacts/rook-next
+            training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-state-v2-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v1-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            rook-state-v2-${{ runner.os }}-
+            rook-brain-state-v1-${{ runner.os }}-
 
       - name: Install training dependencies
         run: python -m pip install -r training/requirements.txt
 
-      - name: Run pipeline tests
-        working-directory: training
-        run: python -m unittest discover -v
+      - name: Prepare documented language corpus
+        run: python training/prepare_wikitext.py
 
-      - name: Train Rook and checkpoint progress
-        id: train-rook
-        run: python training/rook_worker.py --max-runtime-seconds 19800 --ctx 256 --batch 2 --save-every 25 --eval-every 100
+      - name: Run training pipeline tests
+        run: python -m unittest discover -s training -v
 
-      - name: Publish verified progress snapshot
-        if: success() && hashFiles('artifacts/rook-next/report.json') != ''
-        run: |
-          mkdir -p rook-status
-          cp artifacts/rook-next/report.json rook-status/latest.json
-          cp artifacts/rook-next/dataset_manifest.json rook-status/dataset_manifest.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add rook-status/latest.json rook-status/dataset_manifest.json
-          if git diff --cached --quiet; then
-            echo "Progress snapshot unchanged."
-          else
-            git commit -m "Record Rook training progress"
-            git push
-          fi
+      - name: Audit corpus and provenance
+        run: python training/rook_brain.py --audit-only
 
-      - name: Save training state for the next run
+      - name: Train Rook from random initialization or resume his own checkpoint
+        run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
+
+      - name: Save Rook Brain checkpoints and dataset cache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: |
-            artifacts/rook-next
+            training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-state-v2-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v1-${{ runner.os }}-${{ github.run_id }}
 
-      - name: Upload the exact trained checkpoint for browser export
-        if: success() && hashFiles('artifacts/rook-next/best.pt') != ''
+      - name: Upload training report
+        if: always() && hashFiles('training/artifacts/rook-brain/report.json') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: rook-training-checkpoint
+          name: rook-brain-report-${{ github.run_number }}
           path: |
-            artifacts/rook-next/best.pt
-            artifacts/rook-next/report.json
-          if-no-files-found: error
+            training/artifacts/rook-brain/report.json
+            training/artifacts/rook-brain/corpus_audit.json
+            training/artifacts/rook-brain/dataset_manifest.json
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload Rook's progress report
-        if: always() && hashFiles('artifacts/rook-next/report.json') != ''
+      - name: Upload best checkpoint
+        if: success() && hashFiles('training/artifacts/rook-brain/best.pt') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: rook-progress-${{ github.run_number }}
-          path: |
-            artifacts/rook-next/report.json
-            artifacts/rook-next/dataset_manifest.json
-          if-no-files-found: ignore
+          name: rook-brain-checkpoint-${{ github.run_number }}
+          path: training/artifacts/rook-brain/best.pt
+          if-no-files-found: error
           retention-days: 30
