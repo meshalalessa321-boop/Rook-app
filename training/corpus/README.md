@@ -29,3 +29,7 @@ At least three distinct, non-duplicate documents are required. For meaningful ev
 - Do not resume a legacy assistant-objective checkpoint in this pipeline.
 - Loss/perplexity measures prediction of held-out text, not proof of human-like understanding.
 - Training outputs go to `training/artifacts/rook-brain/`; they do not automatically replace the public ONNX model. Validate and export deliberately after training.
+
+## Identity rule
+
+Do not add prompt templates or curated training labels intended to tell Rook what he is. Never inject an identity statement into the model's context. Ordinary licensed text discussing AI may exist in a broad corpus as a topic, but it is not to be framed as a statement about Rook.
