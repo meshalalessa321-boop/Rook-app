@@ -51,7 +51,14 @@ def main():
     parser.add_argument("--max-steps", type=int, default=0, help="0 means run until the time limit")
     parser.add_argument("--save-every", type=int, default=25)
     parser.add_argument("--eval-every", type=int, default=100)
+    parser.add_argument("--allow-legacy-assistant-objective", action="store_true", help="Explicitly opt into the retired assistant-response training objective.")
     args = parser.parse_args()
+    if not args.allow_legacy_assistant_objective:
+        raise SystemExit(
+            "Training paused: this worker optimizes assistant-response behavior from OpenAssistant. "
+            "That is not Rook's intended objective. Do not resume this path; build the replacement "
+            "from broad, licensed text with an unconditioned next-token objective and no prescribed identity."
+        )
 
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
