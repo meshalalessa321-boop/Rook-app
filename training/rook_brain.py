@@ -119,6 +119,7 @@ def main():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--audit-only", action="store_true")
     p.add_argument("--smoke", action="store_true", help="Run two tiny steps to validate the pipeline.")
+    p.add_argument("--fresh", action="store_true", help="Ignore saved Rook Brain state and start from random weights.")
     a = p.parse_args()
     random.seed(a.seed)
     torch.manual_seed(a.seed)
@@ -148,16 +149,40 @@ def main():
     if a.smoke:
         d, layers, heads, ctx, batch_size, steps = 192, 4, 6, 64, 2, 2
         train, valid, test = examples(train_docs, ctx), examples(val_docs, ctx), examples(test_docs, ctx)
-    model = Rook(d, layers, heads, ctx).to(device)  # fresh random initialization, intentionally
+    model = Rook(d, layers, heads, ctx).to(device)  # fresh random initialization unless a compatible resume exists
     optimizer = torch.optim.AdamW(model.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    config = {"d":d,"layers":layers,"heads":heads,"ctx":ctx,"vocab":V,"position_scheme":"prefix-right-pad-v2"}
+    corpus_fingerprint = hashlib.sha256(
+        "".join(sorted(doc["sha256"] for doc in docs)).encode("ascii")
+    ).hexdigest()
+    resume_path = OUT / "resume.pt"
+    best_path = OUT / "best.pt"
+    start_step = 0
     best = float("inf")
+    if a.smoke:
+        a.fresh = True
+    if resume_path.exists() and not a.fresh:
+        saved = torch.load(resume_path, map_location=device, weights_only=False)
+        if saved.get("config") != config:
+            raise SystemExit("Saved checkpoint configuration differs. Use --fresh to intentionally start a new model.")
+        if saved.get("corpus_fingerprint") != corpus_fingerprint:
+            raise SystemExit("Corpus changed since the saved checkpoint. Review the new corpus, then use --fresh for a new run.")
+        model.load_state_dict(saved["model"])
+        if "optimizer" in saved:
+            optimizer.load_state_dict(saved["optimizer"])
+        start_step = int(saved.get("step", 0))
+        best = float(saved.get("best_validation_loss", float("inf")))
+        print(json.dumps({"event":"resumed","step":start_step,"best_validation_loss":best,"corpus_fingerprint":corpus_fingerprint}), flush=True)
+    else:
+        print(json.dumps({"event":"fresh_initialization","pretrained_weights":False,"corpus_fingerprint":corpus_fingerprint}), flush=True)
     start = time.time()
     report = {"architecture": "random-init byte Transformer", "pretrained_weights": False,
               "external_inference_api": False, "objective": "full-sequence next-token prediction",
-              "speaker_role_objective": False, "config": {"d":d,"layers":layers,"heads":heads,"ctx":ctx,"vocab":V,"position_scheme":"prefix-right-pad-v2"},
+              "speaker_role_objective": False, "config": config,
+              "corpus_fingerprint": corpus_fingerprint,
               "parameters": sum(q.numel() for q in model.parameters()), "corpus": manifest}
     (OUT / "dataset_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    for step in range(1, steps+1):
+    for step in range(start_step + 1, start_step + steps + 1):
         model.train()
         batch = random.choices(train, k=batch_size)
         x = torch.tensor([r[0] for r in batch], dtype=torch.long, device=device)
@@ -180,7 +205,7 @@ def main():
                             "val_loss":best,"objective":report["objective"]}, OUT / "best.pt")
             torch.save({"model":model.state_dict(),"optimizer":optimizer.state_dict(),"step":step,
                         "config":report["config"],"objective":report["objective"]}, OUT / "resume.pt")
-    ck = torch.load(OUT / "best.pt", map_location=device, weights_only=False)
+    ck = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(ck["model"])
     report.update({"best_step":ck["step"],"best_validation":evaluate(model,valid,device),
                    "heldout_test":evaluate(model,test,device),
