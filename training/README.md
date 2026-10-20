@@ -19,8 +19,13 @@ The old script and worker now require an explicit `--allow-legacy-assistant-obje
 - Track source licenses, deduplication, language distribution, and held-out splits.
 - Evaluate general text continuation, context coherence, language drift, and multi-turn continuity without using “assistant helpfulness” as the target identity.
 
-The replacement data pipeline and training script have **not yet been implemented**. Do not represent this pause or the old checkpoint as completion of that work.
+The replacement pipeline is now implemented in `rook_brain.py`, and the scheduled workflow uses it instead of the retired worker. The workflow prepares a documented WikiText-103 bootstrap corpus, runs tests and a corpus audit, then trains for 500 steps per run while resuming compatible Rook Brain checkpoints. This is an initial language-modeling foundation, not yet a broad conversational corpus; the first run must pass its checks before we can claim successful training.
 
 ## Identity rule
 
 Never place a hidden or explicit instruction in Rook's model context telling him that he is AI, a machine, a chatbot, or any other predefined identity. This applies to training, inference, evaluation, and tools. Ordinary source texts may discuss AI as a subject, but they must not be turned into an instruction about Rook's identity.
+
+
+## Current training workflow
+
+The GitHub Actions workflow `.github/workflows/rook-training.yml` runs on a daily schedule and can also be started manually. It uses the WikiText-103 training split as a documented English-text bootstrap corpus, predicts the next token across the full sequence, and does not optimize a designated assistant role. Model checkpoints are preserved in the Actions cache and reports/checkpoints are uploaded as run artifacts. The public browser model is not replaced automatically; export and deployment remain a separate, validated step.
