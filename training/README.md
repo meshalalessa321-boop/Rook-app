@@ -1,6 +1,6 @@
 # Rook training status
 
-**Training is paused while the objective is redesigned.** Do not launch the previous worker or training script as a normal training run.
+**The new Rook Brain training workflow is enabled.** It trains with full-sequence language modeling, not assistant-only answer training. The old worker remains retired.
 
 Read [ROOK_TRAINING_OBJECTIVE.md](ROOK_TRAINING_OBJECTIVE.md) before changing the pipeline.
 
@@ -8,7 +8,7 @@ Read [ROOK_TRAINING_OBJECTIVE.md](ROOK_TRAINING_OBJECTIVE.md) before changing th
 
 The previous experiment used OpenAssistant conversation trees, formatted examples as `User: ...\nAssistant:`, and computed loss only over assistant-response bytes. This directly optimizes a designated assistant role, which conflicts with Meshal's project constraints. The old checkpoints are preserved as historical artifacts, not as the intended final direction.
 
-The old script and worker now require an explicit `--allow-legacy-assistant-objective` opt-in. The scheduled GitHub Actions training workflow is disabled, so it cannot keep extending the retired objective in the background.
+The old script and worker require an explicit `--allow-legacy-assistant-objective` opt-in. The GitHub Actions workflow now runs `rook_brain.py` instead; it does not launch the retired worker.
 
 ## Replacement requirements
 
