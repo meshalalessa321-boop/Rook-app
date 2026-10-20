@@ -42,7 +42,7 @@ def main():
         lines = []
 
     for row in dataset:
-        line = str(row.get("text", "")).rstrip()
+        line = str(row.get("text", "")).strip()
         match = HEADING.match(line)
         if match:
             flush()
