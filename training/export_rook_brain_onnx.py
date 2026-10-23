@@ -58,7 +58,7 @@ def main():
 
     # Exercise real autoregressive inference using the same prefix/right-padding
     # position scheme as training. This test validates execution, not quality.
-    prompt = [BOS] + list("User: Hi.\\nAssistant:".encode("utf-8"))
+    prompt = [BOS] + list("User: Hi.\nAssistant:".encode("utf-8"))
     generated = []
     for _ in range(24):
         seq = (prompt + generated)[-CTX:]
@@ -97,7 +97,7 @@ def main():
         "sample_for_test_prompt": sample,
         "quality_note": "Successful export and inference do not imply coherent conversation; this is an early-stage language-modeling checkpoint.",
     }
-    MANIFEST_OUT.write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+    MANIFEST_OUT.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest, indent=2))
 
 
