@@ -112,3 +112,23 @@ jobs:
             gh release create "$TAG" --title "Rook Brain browser model" --notes "Automatically updated, runtime-verified browser export of Rook's from-scratch checkpoint. No pretrained weights or external inference API."
           fi
           gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --clobber
+
+      - name: Publish browser model on a stable raw-content branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/rook-model-publish
+          cp models/rook-brain.onnx /tmp/rook-model-publish/rook-brain.onnx
+          cp rook-status/brain.json /tmp/rook-model-publish/brain.json
+          git checkout --orphan rook-model-publish
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/rook-model-publish/rook-brain.onnx ./rook-brain.onnx
+          cp /tmp/rook-model-publish/brain.json ./brain.json
+          git add rook-brain.onnx brain.json
+          git commit -m "Publish latest verified Rook browser model"
+          git push --force origin HEAD:rook-model
