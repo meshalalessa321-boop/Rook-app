@@ -9,13 +9,14 @@ on:
     paths:
       - ".github/workflows/rook-training.yml"
       - "training/rook_brain.py"
+      - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
       - "training/test_rook_brain.py"
       - "training/requirements.txt"
       - "training/corpus/**"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: rook-brain-training
@@ -62,6 +63,12 @@ jobs:
       - name: Train Rook from random initialization or resume his own checkpoint
         run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
 
+      - name: Install ONNX export and browser-runtime test dependencies
+        run: python -m pip install onnx onnxruntime numpy
+
+      - name: Export and test the exact Rook Brain checkpoint trained in this run
+        run: python training/export_rook_brain_onnx.py
+
       - name: Save Rook Brain checkpoints and dataset cache
         if: always()
         uses: actions/cache/save@v4
@@ -92,3 +99,16 @@ jobs:
           path: training/artifacts/rook-brain/best.pt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish verified model as a stable browser-download release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="rook-brain-latest"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Rook Brain browser model" --notes "Automatically updated, runtime-verified browser export of Rook's from-scratch checkpoint. No pretrained weights or external inference API."
+          fi
+          gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --clobber
