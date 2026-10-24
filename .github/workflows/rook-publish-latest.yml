@@ -1,0 +1,89 @@
+name: Publish Rook's latest trained brain
+
+on:
+  push:
+    branches: [rook-upgrade-experiment-v2]
+    paths:
+      - ".github/workflows/rook-publish-latest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  export-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out Rook
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+
+      - name: Restore the completed training run's checkpoint cache
+        uses: actions/cache/restore@v4
+        with:
+          path: training/artifacts/rook-brain
+          key: rook-brain-state-v1-Linux-40096586165
+          restore-keys: |
+            rook-brain-state-v1-Linux-
+
+      - name: Confirm fine-tuned checkpoint exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s training/artifacts/rook-brain/conversation-best.pt
+          ls -lh training/artifacts/rook-brain/conversation-best.pt
+
+      - name: Install export dependencies
+        run: |
+          python -m pip install -r training/requirements.txt
+          python -m pip install onnx onnxruntime numpy
+
+      - name: Export and validate the trained 49.6M-parameter checkpoint
+        run: python training/export_rook_brain_onnx.py
+
+      - name: Upload the actual browser model and metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-brain-browser-model
+          path: |
+            models/rook-brain.onnx
+            rook-status/brain.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish model release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="rook-brain-latest"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Rook Brain browser model" --notes "Export of Rook's random-initialized and conversationally fine-tuned 49.6M-parameter checkpoint. No pretrained weights or external inference API. Runtime tests validate execution, not conversational quality."
+          fi
+          gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --clobber
+
+      - name: Publish raw model branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/rook-model-publish
+          cp models/rook-brain.onnx /tmp/rook-model-publish/rook-brain.onnx
+          cp rook-status/brain.json /tmp/rook-model-publish/brain.json
+          git checkout --orphan rook-model
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/rook-model-publish/rook-brain.onnx ./rook-brain.onnx
+          cp /tmp/rook-model-publish/brain.json ./brain.json
+          git add rook-brain.onnx brain.json
+          git commit -m "Publish verified 49.6M Rook browser model"
+          git push --force origin HEAD:rook-model
