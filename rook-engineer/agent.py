@@ -122,6 +122,7 @@ def validate_patch() -> list[str]:
 
 
 def run_checks():
+    subprocess.run([sys.executable, "-m", "pip", "install", "-r", "training/requirements.txt"], check=True)
     subprocess.run([sys.executable, "-m", "compileall", "-q", "training"], check=True)
     subprocess.run(["git", "diff", "--check"], check=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "training", "-v"], check=True)
@@ -168,7 +169,7 @@ def main() -> int:
             subprocess.run(["git", "apply", str(PATCH_FILE)], check=True)
             changed = validate_patch()
             run_checks()
-            report += "\n\n## Validated proposal\n\n" + result.get("summary", "") + "\n\nChanged files: " + ", ".join(changed) + "\n\nThe proposed patch passed the configured checks in this runner. It has not been pushed, merged, deployed, or used to train Rook. Review the attached patch artifact before applying it.\n"
+            report += "\n\n## Validated proposal\n\n" + result.get("summary", "") + "\n\nChanged files: " + ", ".join(changed) + "\n\nThe proposed patch passed the configured checks in this runner. It has not been pushed, merged, deployed, or used to train Rook. Review the diff below before applying it.\n\n```diff\n" + PATCH_FILE.read_text(encoding="utf-8") + "\n```\n"
         except Exception as exc:
             subprocess.run(["git", "apply", "--reverse", str(PATCH_FILE)], check=False)
             report += f"\n\n## Proposal not published\n\nValidation failed: {type(exc).__name__}: {exc}. No PR was merged.\n"
