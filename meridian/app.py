@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, String, Text, Boolean, DateTime, Integer, select
+from sqlalchemy import create_engine, String, Text, Boolean, DateTime, Integer, select, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 def now():
@@ -279,7 +279,9 @@ async def run_task(task_id,goal):
             summary="Stopped at the configured tool-step limit. Split the task into smaller goals to continue."
         if not summary: summary="Execution finished without a final model summary."
         review=any("approval_id" in line for line in evidence)
-        pending_remote_run=any("accepted_waiting_for_run_record" in line or '"status": "queued"' in line or '"status": "in_progress"' in line for line in evidence)
+        remote_tool_results=[line for line in evidence if line.startswith("run_rook_sample_tests:") or line.startswith("check_rook_sample_test:")]
+        latest_remote_result=remote_tool_results[-1] if remote_tool_results else ""
+        pending_remote_run=bool(latest_remote_result) and ("accepted_waiting_for_run_record" in latest_remote_result or '"status": "queued"' in latest_remote_result or '"status": "in_progress"' in latest_remote_result)
         blocked=tool_errors>0 or not did_use_tools or step_limit_hit or pending_remote_run
         run_status="review" if review else ("blocked" if blocked else "done")
         with Session() as s:
@@ -308,11 +310,11 @@ async def worker_loop():
             state["worker"]="disabled";await asyncio.sleep(POLL_SECONDS);continue
         if not os.getenv("OPENAI_API_KEY"):
             state["worker"]="waiting_for_model";await asyncio.sleep(max(10,POLL_SECONDS));continue
-        if daily_model_calls_used()>=MAX_DAILY_MODEL_CALLS:
-            state["worker"]="daily_limit_reached";await asyncio.sleep(60);continue
         try:
+            if daily_model_calls_used()>=MAX_DAILY_MODEL_CALLS:
+                state["worker"]="daily_limit_reached";await asyncio.sleep(60);continue
             with Session() as s:
-                task=s.scalars(select(Task).where(Task.status=="queued").order_by(Task.priority.desc(),Task.created_at.asc()).limit(1).with_for_update(skip_locked=True)).first()
+                task=s.scalars(select(Task).where(Task.status=="queued").order_by(case((Task.priority=="high",0),(Task.priority=="normal",1),else_=2),Task.created_at.asc()).limit(1).with_for_update(skip_locked=True)).first()
                 work=None
                 if task: task.status="running";task.blocker="";s.commit();work=(task.id,task.goal)
             if work: await run_task(*work)
@@ -347,7 +349,8 @@ async def status(_:bool=Depends(owner)):
         db_ready=True
     except Exception as exc:
         state["last_error"]="Database health check failed: "+str(exc)[:300]
-    return {"worker":state["worker"],"heartbeat":state["heartbeat"],"last_error":state["last_error"],"active_task":state["active_task"],"model_ready":bool(os.getenv("OPENAI_API_KEY")),"github_ready":bool(os.getenv("GITHUB_TOKEN")),"database_ready":db_ready,"worker_enabled":WORKER_ENABLED,"model":MODEL,"allowed_repos":sorted(ALLOWED_REPOS),"model_calls_today":daily_model_calls_used(),"daily_model_call_limit":MAX_DAILY_MODEL_CALLS,"max_completion_tokens":MAX_COMPLETION_TOKENS}
+    calls_today=daily_model_calls_used() if db_ready else None
+    return {"worker":state["worker"],"heartbeat":state["heartbeat"],"last_error":state["last_error"],"active_task":state["active_task"],"model_ready":bool(os.getenv("OPENAI_API_KEY")),"github_ready":bool(os.getenv("GITHUB_TOKEN")),"database_ready":db_ready,"worker_enabled":WORKER_ENABLED,"model":MODEL,"allowed_repos":sorted(ALLOWED_REPOS),"model_calls_today":calls_today,"daily_model_call_limit":MAX_DAILY_MODEL_CALLS,"max_completion_tokens":MAX_COMPLETION_TOKENS}
 @app.get("/api/overview")
 async def overview(_:bool=Depends(owner)):
     with Session() as s:
