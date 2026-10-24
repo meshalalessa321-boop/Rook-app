@@ -4,18 +4,18 @@ Meridian is the separate engineering AI assigned to help develop Rook. It is not
 
 ## Mission
 
-Every six hours, Meridian inspects the actual repository, prioritizes Rook's from-scratch training pipeline, and chooses one narrow engineering fix. When justified, it proposes a patch, runs syntax checks and the training unit tests, then opens or updates a review pull request. It never auto-merges or deploys.
+Every six hours, Meridian inspects the repository, prioritizes Rook's from-scratch training pipeline, and chooses one narrow engineering fix. When justified, it proposes a patch, runs syntax checks and the training unit tests, and includes the diff in the engineering report artifact. It does not push or merge code, deploy, or directly start a Rook training run.
 
 ## Model and cost
 
-Default API model: gpt-6.1-sol. Confirm API access before first use. API usage is billed separately from a ChatGPT subscription. Each run makes one model request, reads a bounded set of source files, and may run the training unit tests.
+Default API model: gpt-6.1-sol. Confirm API access before first use. API usage is billed separately from a ChatGPT subscription. Each run makes one model request, reads a bounded set of source files, and may install the training dependencies to run tests.
 
 ## Enable it
 
 1. Add an OpenAI API key as a GitHub Actions repository secret named OPENAI_API_KEY. Never put the key in code or commit it.
 2. Merge the reviewed Meridian workflow into main.
 3. Open Actions, choose Meridian Engineering Partner, and run the workflow once.
-4. Each run uploads a report and patch artifact. If a patch passes checks, Meridian opens or updates a review PR on branch meridian/next-training-fix.
+4. Each successful run uploads rook-engineer-report.md as an artifact. The report includes the proposed diff when Meridian's patch passes validation.
 
 ## Rules
 
@@ -28,4 +28,4 @@ Default API model: gpt-6.1-sol. Confirm API access before first use. API usage i
 
 ## Limits
 
-GitHub-hosted runners start each scheduled run and then stop. This is recurring background work, not one process continuously running 24/7. The worker requires the OPENAI_API_KEY secret and a reviewed/merged workflow. It proposes reviewable fixes to the training pipeline; it does not auto-merge them or directly start a Rook training run.
+GitHub-hosted runners start each scheduled run and then stop. This is recurring background work, not one process continuously running 24/7. The worker requires the OPENAI_API_KEY secret and a reviewed/merged workflow. It creates reviewable fixes but does not auto-apply them to main.
