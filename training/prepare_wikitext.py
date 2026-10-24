@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Prepare a documented, open-licensed text corpus from WikiText-2.
+"""Prepare a documented, open-licensed text corpus from WikiText-103.
 
-Uses the original Wikipedia-derived WikiText-2 training split only. Articles
+Uses the original Wikipedia-derived WikiText-103 training split only. Articles
 are kept as separate documents so rook_brain.py can split documents before
 training. This is a bootstrap corpus, not a complete conversational corpus.
 """
@@ -16,7 +16,7 @@ CORPUS = ROOT / "corpus"
 TEXTS = CORPUS / "texts"
 MANIFEST = CORPUS / "manifest.jsonl"
 DATASET_ID = "Salesforce/wikitext"
-CONFIG = "wikitext-2-v1"
+CONFIG = "wikitext-103-v1"
 DATASET_URL = "https://huggingface.co/datasets/Salesforce/wikitext"
 LICENSE = "CC BY-SA 3.0"
 HEADING = re.compile(r"^= ([^=].*?) =$")
@@ -59,7 +59,7 @@ def main():
         (CORPUS / relpath).write_text(body, encoding="utf-8")
         manifest_rows.append({
             "path": relpath,
-            "source": f"WikiText-2 / Wikipedia-derived article: {doc_title}",
+            "source": f"WikiText-103 / Wikipedia-derived article: {doc_title}",
             "license": LICENSE,
             "url": DATASET_URL,
             "language": "en",
