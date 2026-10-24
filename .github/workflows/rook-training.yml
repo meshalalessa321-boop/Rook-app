@@ -46,9 +46,9 @@ jobs:
             training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-brain-state-v1-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            rook-brain-state-v1-${{ runner.os }}-
+            rook-brain-state-v2-${{ runner.os }}-
 
       - name: Install training dependencies
         run: python -m pip install -r training/requirements.txt
@@ -63,7 +63,7 @@ jobs:
         run: python training/rook_brain.py --audit-only
 
       - name: Train Rook from random initialization or resume his own checkpoint
-        run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
+        run: python training/rook_brain.py --steps 1500 --ctx 256 --batch 4
 
       - name: Teach Rook to answer real conversations
         run: python training/finetune_rook_conversation.py --steps 1000 --batch 8
