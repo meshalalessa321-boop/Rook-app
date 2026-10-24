@@ -4,31 +4,28 @@ Meridian is the separate engineering AI assigned to help develop Rook. It is not
 
 ## Mission
 
-Meridian periodically inspects the repository, prioritizes Rook's actual from-scratch language-model training pipeline, identifies concrete blockers, and writes evidence-based engineering reports. It focuses on training correctness, corpus preparation and licensing, evaluation, checkpoint resume, and background reliability.
+Every six hours, Meridian inspects the actual repository, prioritizes Rook's from-scratch training pipeline, and chooses one narrow engineering fix. When justified, it proposes a patch, runs syntax checks and the training unit tests, then opens or updates a review pull request. It never auto-merges or deploys.
 
 ## Model and cost
 
-Default API model: `gpt-6.1-sol`. Confirm access in the OpenAI API project before first use. API usage is billed separately from a ChatGPT subscription. Each scheduled run makes one model request.
+Default API model: gpt-6.1-sol. Confirm API access before first use. API usage is billed separately from a ChatGPT subscription. Each run makes one model request, reads a bounded set of source files, and may run the training unit tests.
 
 ## Enable it
 
-1. Add an OpenAI API key as a GitHub Actions repository secret named `OPENAI_API_KEY`. Never put the key in code or commit it.
-2. Open **Actions → Rook Engineering Partner → Run workflow** to test a single run.
-3. Each successful run uploads `rook-engineer-report.md` as an artifact.
-4. The workflow is scheduled every six hours.
+1. Add an OpenAI API key as a GitHub Actions repository secret named OPENAI_API_KEY. Never put the key in code or commit it.
+2. Merge the reviewed Meridian workflow into main.
+3. Open Actions, choose Meridian Engineering Partner, and run the workflow once.
+4. Each run uploads a report and patch artifact. If a patch passes checks, Meridian opens or updates a review PR on branch meridian/next-training-fix.
 
-## Project rules Meridian must preserve
+## Rules
 
 - Rook stays initialized from random weights. Do not swap in a pretrained model.
 - Do not optimize Rook as a conventional assistant or train only designated assistant answers.
-- Do not inject an identity instruction telling Rook he is an AI, a machine, a chatbot, or any other prescribed identity.
-- Treat `training/rook_brain.py` and `training/ROOK_TRAINING_OBJECTIVE.md` as the intended replacement direction. Treat old assistant-only training scripts as legacy.
-- Never report a training run or test as successful without actual logs/artifacts proving it.
+- Do not inject an identity instruction telling Rook he is an AI, machine, chatbot, or any other prescribed identity.
+- Treat training/rook_brain.py and training/ROOK_TRAINING_OBJECTIVE.md as the intended direction. Treat old assistant-only training scripts as legacy.
+- Never report training or tests as successful without logs proving it.
+- Never modify source corpus/licensing metadata, private correction data, checkpoints, or model binaries automatically.
 
-## Current scope and limits
+## Limits
 
-- Read-only source inspection and report generation.
-- No automatic code commits, pull requests, deployments, or training runs yet.
-- No hosted-model fallback for Rook.
-- GitHub-hosted runners start each scheduled run and then stop. This is periodic background work, not a single process continuously running 24/7.
-- The API key must be configured before Meridian can make its first report.
+GitHub-hosted runners start each scheduled run and then stop. This is recurring background work, not one process continuously running 24/7. The worker requires the OPENAI_API_KEY secret and a reviewed/merged workflow. It proposes reviewable fixes to the training pipeline; it does not auto-merge them or directly start a Rook training run.
