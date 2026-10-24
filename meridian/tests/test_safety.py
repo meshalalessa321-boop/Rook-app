@@ -100,6 +100,8 @@ def test_approved_changes_are_committed_atomically_without_contents_put(monkeypa
     calls=[]
     def fake_gh(method,path,repo_arg,**kwargs):
         calls.append((method,path,kwargs.get("json")))
+        if "/git/ref/heads/meridian/" in path:
+            raise RuntimeError("GitHub API 404: Not Found")
         if path.endswith("/git/ref/heads/main"):
             return {"object":{"sha":"base-sha"}}
         if path.endswith("/git/commits/base-sha"):
