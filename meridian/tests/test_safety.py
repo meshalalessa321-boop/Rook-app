@@ -137,3 +137,26 @@ def test_memory_source_urls_reject_script_schemes():
     assert meridian.safe_source_url("javascript:alert(1)") == ""
     assert meridian.safe_source_url("//example.com/path") == ""
     assert meridian.safe_source_url("not a url") == ""
+
+
+def test_restart_recovery_requeues_tasks_and_unlocks_approvals(monkeypatch, tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app import Base, Task, Run, Approval, recover_interrupted_work
+    db = create_engine("sqlite:///" + str(tmp_path / "recovery.db"))
+    Base.metadata.create_all(db)
+    local_session = sessionmaker(db, expire_on_commit=False)
+    monkeypatch.setattr(meridian, "Session", local_session)
+    with local_session() as session:
+        task = Task(id="task-running", title="Interrupted task", goal="resume me", status="running")
+        run = Run(id="run-running", task_id="task-running", status="running", summary="Was working")
+        approval = Approval(id="approval-publishing", task_id="task-running", title="Publishing", details="{}", status="publishing")
+        session.add_all([task, run, approval])
+        session.commit()
+    recover_interrupted_work()
+    with local_session() as session:
+        assert session.get(Task, "task-running").status == "queued"
+        assert session.get(Run, "run-running").status == "interrupted"
+        assert session.get(Run, "run-running").finished_at is not None
+        assert session.get(Approval, "approval-publishing").status == "pending"
+    db.dispose()

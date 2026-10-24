@@ -363,17 +363,24 @@ async def worker_loop():
         except Exception as exc:
             state["worker"]="error";state["last_error"]=str(exc)[:500];await asyncio.sleep(POLL_SECONDS)
 
-@app.on_event("startup")
-async def startup():
-    Base.metadata.create_all(engine)
+def recover_interrupted_work():
+    """Make incomplete work retryable after a crash or deployment restart."""
     with Session() as s:
         for task in s.scalars(select(Task).where(Task.status=="running")):
-            task.status="queued";task.blocker="Requeued after restart; inspect the previous run for partial progress."
+            task.status="queued"
+            task.blocker="Requeued after restart; inspect the previous run for partial progress."
         for run in s.scalars(select(Run).where(Run.status=="running")):
             run.status="interrupted"
             run.finished_at=now()
             run.summary=(run.summary or "Execution stopped")+"\\nService restarted before a final result was recorded."
+        for approval in s.scalars(select(Approval).where(Approval.status=="publishing")):
+            approval.status="pending"
         s.commit()
+
+@app.on_event("startup")
+async def startup():
+    Base.metadata.create_all(engine)
+    recover_interrupted_work()
     asyncio.create_task(worker_loop())
 
 @app.get("/health")
