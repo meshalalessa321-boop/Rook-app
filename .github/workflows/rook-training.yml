@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "17 4 * * *"
   push:
-    branches: [main, rook-upgrade-experiment]
+    branches: [main, rook-upgrade-experiment, rook-upgrade-experiment-v2]
     paths:
       - ".github/workflows/rook-training.yml"
       - "training/rook_brain.py"
@@ -46,14 +46,14 @@ jobs:
             training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-brain-state-v2-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v3-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            rook-brain-state-v2-${{ runner.os }}-
+            rook-brain-state-v3-${{ runner.os }}-
 
       - name: Install training dependencies
         run: python -m pip install -r training/requirements.txt
 
-      - name: Prepare documented language corpus
+      - name: Prepare larger documented language corpus
         run: python training/prepare_wikitext.py
 
       - name: Run training pipeline tests
