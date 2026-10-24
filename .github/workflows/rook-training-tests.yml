@@ -1,0 +1,42 @@
+name: Rook Training Pipeline Tests
+
+on:
+  pull_request:
+    paths:
+      - "training/**"
+      - ".github/workflows/rook-training.yml"
+      - ".github/workflows/rook-training-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-training-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+
+      - name: Install training dependencies
+        run: python -m pip install -r training/requirements.txt
+
+      - name: Compile training Python files
+        run: python -m compileall -q training
+
+      - name: Run training unit tests
+        run: python -m unittest discover -s training -v
+
+      - name: Verify no assistant-only fine-tuning is launched
+        run: |
+          ! grep -F "python training/finetune_rook_conversation.py" .github/workflows/rook-training.yml
+          ! grep -F 'ROOT / "finetune_rook_conversation.py"' training/rook_brain.py
+          grep -F '"best.pt"' training/export_rook_brain_onnx.py
+          ! grep -F '"conversation-best.pt"' training/export_rook_brain_onnx.py
