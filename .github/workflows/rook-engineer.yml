@@ -1,4 +1,4 @@
-name: Rook Engineering Partner
+name: Meridian Engineering Partner
 
 on:
   workflow_dispatch:
@@ -9,27 +9,34 @@ permissions:
   contents: read
 
 concurrency:
-  group: rook-engineering-partner
+  group: meridian-engineering-partner
   cancel-in-progress: false
 
 jobs:
-  review:
+  review-and-propose:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Run engineering review
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+
+      - name: Run Meridian
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ROOK_ENGINEER_MODEL: gpt-6.1-sol
         run: python3 rook-engineer/agent.py
 
-      - name: Upload report
+      - name: Upload Meridian report and patch
         if: always() && hashFiles('rook-engineer-report.md') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: rook-engineering-report
+          name: meridian-engineering-report
           path: rook-engineer-report.md
           retention-days: 30
