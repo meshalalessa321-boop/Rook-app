@@ -327,6 +327,10 @@ async def startup():
     with Session() as s:
         for task in s.scalars(select(Task).where(Task.status=="running")):
             task.status="queued";task.blocker="Requeued after restart; inspect the previous run for partial progress."
+        for run in s.scalars(select(Run).where(Run.status=="running")):
+            run.status="interrupted"
+            run.finished_at=now()
+            run.summary=(run.summary or "Execution stopped")+"\\nService restarted before a final result was recorded."
         s.commit()
     asyncio.create_task(worker_loop())
 

@@ -16,7 +16,7 @@ async function show(nextPage){
  const target=$("#content");target.innerHTML=card("Loading","Fetching current records…");
  try{
   const status=await api("/api/status");
-  $("#status").innerHTML=pill(status.worker)+"<br>"+(status.model_ready?"Model ready":"Model not configured")+" · "+(status.github_ready?"GitHub ready":"GitHub not configured");
+  $("#status").innerHTML=pill(status.worker)+"<br>"+(status.model_ready?"Model ready":"Model not configured")+" · "+(status.github_ready?"GitHub ready":"GitHub not configured")+"<br>Model calls today: "+esc(status.model_calls_today)+"/"+esc(status.daily_model_call_limit);
   $("#readiness").textContent="Model "+(status.model_ready?"connected":"missing")+" · GitHub "+(status.github_ready?"connected":"missing");
   if(page==="overview"){
    const data=await api("/api/overview");

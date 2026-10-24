@@ -15,7 +15,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-5.2
+        value: gpt-5.4-mini
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_ALLOWED_REPOS
@@ -30,6 +30,10 @@ services:
         value: "5"
       - key: WORKER_MAX_TOOL_STEPS
         value: "10"
+      - key: MAX_COMPLETION_TOKENS
+        value: "2500"
+      - key: MAX_DAILY_MODEL_CALLS
+        value: "60"
 databases:
   - name: meridian-db
     databaseName: meridian
