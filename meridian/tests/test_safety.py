@@ -129,3 +129,11 @@ def test_approved_changes_are_committed_atomically_without_contents_put(monkeypa
     with local_session() as session:
         assert session.get(Approval,approval_id).status == "submitted"
     db.dispose()
+
+
+def test_memory_source_urls_reject_script_schemes():
+    assert meridian.safe_source_url("https://example.com/docs") == "https://example.com/docs"
+    assert meridian.safe_source_url("http://example.com") == "http://example.com"
+    assert meridian.safe_source_url("javascript:alert(1)") == ""
+    assert meridian.safe_source_url("//example.com/path") == ""
+    assert meridian.safe_source_url("not a url") == ""

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from urllib.parse import urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
@@ -106,6 +107,14 @@ def recent_memories(limit=12):
         rows=list(s.scalars(select(Memory).order_by(Memory.created_at.desc()).limit(limit)))
     return [{"title":m.title,"content":m.content,"category":m.category,"verified":m.verified,"source_url":m.source_url} for m in rows]
 
+def safe_source_url(value):
+    value=(value or "").strip()
+    if not value: return ""
+    try: parsed=urlsplit(value)
+    except ValueError: return ""
+    if parsed.scheme not in ("http","https") or not parsed.netloc: return ""
+    return value[:1000]
+
 def daily_model_calls_used():
     with Session() as s:
         row=s.get(DailyUsage,now().date().isoformat())
@@ -163,7 +172,7 @@ def execute(name,args,task_id=""):
             task=Task(title=args["title"][:200],goal=args["goal"][:10000],priority=args.get("priority","normal") if args.get("priority") in ("low","normal","high") else "normal")
             s.add(task);s.commit();s.refresh(task);return record(task)
         if name=="remember":
-            memory=Memory(title=args["title"][:200],content=args["content"][:12000],category=args.get("category","project")[:32],verified=bool(args.get("verified",False)),source_url=args.get("source_url","")[:1000])
+            memory=Memory(title=args["title"][:200],content=args["content"][:12000],category=args.get("category","project")[:32],verified=bool(args.get("verified",False)),source_url=safe_source_url(args.get("source_url","")))
             s.add(memory);s.commit();s.refresh(memory);return record(memory)
         if name=="propose_code_changes":
             repo=args["repo"]
@@ -414,7 +423,7 @@ class MemoryInput(BaseModel):
 @app.post("/api/memories")
 async def add_memory(data:MemoryInput,_:bool=Depends(owner)):
     with Session() as s:
-        x=Memory(title=data.title,content=data.content,category=data.category[:32],verified=data.verified,source_url=data.source_url[:1000])
+        x=Memory(title=data.title,content=data.content,category=data.category[:32],verified=data.verified,source_url=safe_source_url(data.source_url))
         s.add(x);s.commit();s.refresh(x);return record(x)
 @app.get("/api/runs")
 async def runs(_:bool=Depends(owner)):
