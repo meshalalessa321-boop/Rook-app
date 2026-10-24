@@ -195,23 +195,54 @@ def execute(name,args,task_id=""):
 def publish_approved(approval_id):
     with Session() as s:
         a=s.get(Approval,approval_id)
-        if not a or a.status!="pending": raise RuntimeError("Approval is no longer pending")
+        if not a or a.status not in ("pending","publishing"): raise RuntimeError("Approval is no longer available")
         proposal=json.loads(a.details);repo=proposal["repo"];files=proposal["files"];title=a.title;summary=proposal["summary"]
     if repo not in ALLOWED_REPOS: raise RuntimeError("Repository is not allow-listed")
-    base=gh("GET","/repos/"+repo+"/git/ref/heads/main",repo)["object"]["sha"]
+    paths=[safe_path(file["path"]) for file in files]
+    if not 1<=len(files)<=8: raise RuntimeError("Proposal must include 1-8 files")
     branch="meridian/"+approval_id.replace("-","")[:20]
-    gh("POST","/repos/"+repo+"/git/refs",repo,json={"ref":"refs/heads/"+branch,"sha":base})
-    paths=[]
-    for file in files:
-        path=safe_path(file["path"]);payload={"message":"Meridian proposal: "+title[:100],"content":base64.b64encode(file["content"].encode()).decode(),"branch":branch}
-        try:
-            current=gh("GET","/repos/"+repo+"/contents/"+path,repo,params={"ref":branch})
-            payload["sha"]=current["sha"]
-        except RuntimeError as exc:
-            if "GitHub API 404" not in str(exc): raise
-        gh("PUT","/repos/"+repo+"/contents/"+path,repo,json=payload)
-        paths.append(path)
-    pr=gh("POST","/repos/"+repo+"/pulls",repo,json={"title":"[Meridian] "+title,"head":branch,"base":"main","draft":True,"body":summary+"\n\nCreated only after owner approval. Draft pull request; no merge is performed.\n\nFiles:\n"+"\n".join("- "+p for p in paths)})
+    marker="Meridian-Approval: "+approval_id
+    # Check for an existing branch so retries after a network/PR-creation error do not
+    # leave partial files or create a second set of commits.
+    existing_branch=None
+    try:
+        existing_branch=gh("GET","/repos/"+repo+"/git/ref/heads/"+branch,repo)
+    except RuntimeError as exc:
+        if "GitHub API 404" not in str(exc): raise
+    if existing_branch:
+        branch_sha=existing_branch["object"]["sha"]
+        metadata=gh("GET","/repos/"+repo+"/git/commits/"+branch_sha,repo)
+        if marker not in metadata.get("message",""):
+            raise RuntimeError("A branch with this approval ID exists but its commit marker does not match; refusing to reuse it.")
+    else:
+        base=gh("GET","/repos/"+repo+"/git/ref/heads/main",repo)["object"]["sha"]
+        base_commit=gh("GET","/repos/"+repo+"/git/commits/"+base,repo)
+        entries=[]
+        for file,path in zip(files,paths):
+            body=file["content"]
+            if len(body.encode("utf-8"))>30000: raise RuntimeError("Each proposed file must be under 30 KB")
+            blob=gh("POST","/repos/"+repo+"/git/blobs",repo,json={"content":body,"encoding":"utf-8"})
+            entries.append({"path":path,"mode":"100644","type":"blob","sha":blob["sha"]})
+        tree=gh("POST","/repos/"+repo+"/git/trees",repo,json={"base_tree":base_commit["tree"]["sha"],"tree":entries})
+        commit=gh("POST","/repos/"+repo+"/git/commits",repo,json={
+            "message":"[Meridian] "+title[:100]+"\\n\\n"+marker,
+            "tree":tree["sha"],
+            "parents":[base]
+        })
+        branch_sha=commit["sha"]
+        gh("POST","/repos/"+repo+"/git/refs",repo,json={"ref":"refs/heads/"+branch,"sha":branch_sha})
+    # Idempotently reuse an existing open PR for this unique approval branch.
+    pulls=gh("GET","/repos/"+repo+"/pulls",repo,params={"state":"open","head":repo.split("/")[0]+":"+branch,"base":"main","per_page":10})
+    if pulls:
+        pr=pulls[0]
+    else:
+        pr=gh("POST","/repos/"+repo+"/pulls",repo,json={
+            "title":"[Meridian] "+title,
+            "head":branch,
+            "base":"main",
+            "draft":True,
+            "body":summary+"\\n\\nCreated only after owner approval. Proposed files are committed atomically; this is a draft pull request and is never merged automatically.\\n\\nFiles:\\n"+"\\n".join("- "+p for p in paths)
+        })
     with Session() as s:
         a=s.get(Approval,approval_id);a.status="submitted";a.evidence_url=pr.get("html_url","");s.commit()
     return pr.get("html_url","")
@@ -398,8 +429,13 @@ async def decision(aid:str,data:Decision,_:bool=Depends(owner)):
         a=s.get(Approval,aid)
         if not a or a.status!="pending":raise HTTPException(404,"Pending approval not found")
         if not data.approved:a.status="rejected";s.commit();return {"status":"rejected"}
+        a.status="publishing";s.commit()
     try:url=await asyncio.to_thread(publish_approved,aid)
-    except Exception as exc:raise HTTPException(502,"Could not create draft PR: "+str(exc)[:400])
+    except Exception as exc:
+        with Session() as s:
+            a=s.get(Approval,aid)
+            if a and a.status=="publishing":a.status="pending";s.commit()
+        raise HTTPException(502,"Could not create draft PR: "+str(exc)[:400])
     return {"status":"submitted","url":url}
 @app.get("/api/messages")
 async def messages(_:bool=Depends(owner)):
