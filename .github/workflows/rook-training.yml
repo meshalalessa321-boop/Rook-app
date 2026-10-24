@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "17 4 * * *"
   push:
-    branches: [main]
+    branches: [main, rook-upgrade-experiment]
     paths:
       - ".github/workflows/rook-training.yml"
       - "training/rook_brain.py"
@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: rook-brain-training
+  group: rook-brain-training-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -107,7 +107,7 @@ jobs:
           retention-days: 30
 
       - name: Publish verified model as a stable browser-download release
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
