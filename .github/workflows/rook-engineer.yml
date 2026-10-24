@@ -1,0 +1,35 @@
+name: Rook Engineering Partner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rook-engineering-partner
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run engineering review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ROOK_ENGINEER_MODEL: gpt-6.1-sol
+        run: python3 rook-engineer/agent.py
+
+      - name: Upload report
+        if: always() && hashFiles('rook-engineer-report.md') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-engineering-report
+          path: rook-engineer-report.md
+          retention-days: 30
