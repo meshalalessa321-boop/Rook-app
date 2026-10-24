@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
 <script>
 (() => {
-  const MODEL_URL="https://raw.githubusercontent.com/meshalalessa321-boop/Rook-app/rook-model/rook-brain.onnx",MODEL_META_URL="https://raw.githubusercontent.com/meshalalessa321-boop/Rook-app/rook-model/brain.json",CTX=256,PAD=256,BOS=257,EOS=258,VOCAB=259;
+  const MODEL_URL="https://raw.githubusercontent.com/meshalalessa321-boop/Rook-app/connect-rook-brain-browser/models/rook-step-105500.onnx",MODEL_META_URL="https://raw.githubusercontent.com/meshalalessa321-boop/Rook-app/connect-rook-brain-browser/rook-status/onnx.json",CTX=256,PAD=256,BOS=257,EOS=258,VOCAB=259;
   const $=id=>document.getElementById(id),messagesEl=$("messages"),input=$("input"),send=$("send"),banner=$("banner"),status=$("status"),dot=$("dot");
   let session=null,busy=false,POSITION_MODE="prefix-right-pad-v2";const history=[],decoder=new TextDecoder("utf-8",{fatal:false});
   function setStatus(s,ready=false){status.textContent=s;dot.classList.toggle("ready",ready)}
