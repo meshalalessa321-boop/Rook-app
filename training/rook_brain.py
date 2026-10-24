@@ -4,7 +4,7 @@
 This is deliberately NOT instruction tuning. Every non-padding token is a
 next-token target; no speaker role or answer span is privileged.
 """
-import argparse, hashlib, json, random, time, os, subprocess, sys
+import argparse, hashlib, json, random, time, sys
 from pathlib import Path
 
 import torch
@@ -228,11 +228,7 @@ def main():
                    "note":"Loss is a language-modeling metric, not proof of semantic understanding."})
     (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("FINAL_REPORT " + json.dumps(report, ensure_ascii=False), flush=True)
-    if not a.smoke:
-        conversation_steps = os.environ.get("ROOK_CONVERSATION_STEPS", "1000")
-        conversation_batch = os.environ.get("ROOK_CONVERSATION_BATCH", "8")
-        print(json.dumps({"event":"starting_conversational_finetune","steps":int(conversation_steps),"batch":int(conversation_batch),"pretrained_weights":False}), flush=True)
-        subprocess.run([sys.executable, str(ROOT / "finetune_rook_conversation.py"), "--steps", conversation_steps, "--batch", conversation_batch], check=True)
+    print(json.dumps({"event":"training_stage_complete","objective":"full-sequence next-token prediction","pretrained_weights":False,"speaker_role_objective":False,"note":"Assistant-only conversation fine-tuning is intentionally not launched."}), flush=True)
 
 if __name__ == "__main__":
     main()
