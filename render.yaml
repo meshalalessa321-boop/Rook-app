@@ -4,8 +4,8 @@ services:
     runtime: python
     rootDir: meridian
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-    plan: starter
+    startCommand: python run.py
+    plan: 0.5c-512mb
     region: singapore
     healthCheckPath: /health
     autoDeploy: true
@@ -34,7 +34,7 @@ databases:
   - name: meridian-db
     databaseName: meridian
     user: meridian
-    plan: basic-256mb
+    plan: 0.1c-256mb
     region: singapore
     postgresMajorVersion: "16"
     ipAllowList: []
