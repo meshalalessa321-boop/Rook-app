@@ -110,9 +110,9 @@ def evaluate(model, batches, device, limit=500):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--steps", type=int, default=5000)
-    p.add_argument("--d", type=int, default=512)
-    p.add_argument("--layers", type=int, default=8)
-    p.add_argument("--heads", type=int, default=8)
+    p.add_argument("--d", type=int, default=640)
+    p.add_argument("--layers", type=int, default=10)
+    p.add_argument("--heads", type=int, default=10)
     p.add_argument("--ctx", type=int, default=256)
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--seed", type=int, default=1701)
