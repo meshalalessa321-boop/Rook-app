@@ -168,8 +168,7 @@ def main() -> int:
             subprocess.run(["git", "apply", str(PATCH_FILE)], check=True)
             changed = validate_patch()
             run_checks()
-            url = publish_pr(result.get("summary", "training pipeline improvement"))
-            report += "\n\n## Validated proposal\n\n" + result.get("summary", "") + "\n\nChanged files: " + ", ".join(changed) + "\n\nReview PR: " + url + "\n"
+            report += "\n\n## Validated proposal\n\n" + result.get("summary", "") + "\n\nChanged files: " + ", ".join(changed) + "\n\nThe proposed patch passed the configured checks in this runner. It has not been pushed, merged, deployed, or used to train Rook. Review the attached patch artifact before applying it.\n"
         except Exception as exc:
             subprocess.run(["git", "apply", "--reverse", str(PATCH_FILE)], check=False)
             report += f"\n\n## Proposal not published\n\nValidation failed: {type(exc).__name__}: {exc}. No PR was merged.\n"
