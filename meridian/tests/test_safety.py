@@ -39,3 +39,36 @@ def test_proposal_requires_allowed_repository():
             "summary":"summary",
             "files":[{"path":"README.md","content":"no"}]
         })
+
+
+def test_persistent_memory_is_loaded_from_database(monkeypatch, tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app import Base, Memory, recent_memories
+    db = create_engine("sqlite:///" + str(tmp_path / "memory.db"))
+    Base.metadata.create_all(db)
+    local_session = sessionmaker(db, expire_on_commit=False)
+    monkeypatch.setattr(meridian, "Session", local_session)
+    with local_session() as session:
+        session.add(Memory(title="Model decision", content="Rook keeps his own weights.", category="architecture", verified=True))
+        session.commit()
+    saved = recent_memories(5)
+    assert saved[0]["title"] == "Model decision"
+    assert saved[0]["verified"] is True
+    db.dispose()
+
+def test_daily_model_call_limit_is_persistent_and_checked_before_api(monkeypatch, tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app import Base, DailyUsage, model_call
+    db = create_engine("sqlite:///" + str(tmp_path / "usage.db"))
+    Base.metadata.create_all(db)
+    local_session = sessionmaker(db, expire_on_commit=False)
+    monkeypatch.setattr(meridian, "Session", local_session)
+    monkeypatch.setattr(meridian, "MAX_DAILY_MODEL_CALLS", 1)
+    with local_session() as session:
+        session.add(DailyUsage(day=meridian.now().date().isoformat(), calls=1, input_tokens=0, output_tokens=0))
+        session.commit()
+    with pytest.raises(RuntimeError, match="daily model-call limit reached"):
+        model_call([{"role": "user", "content": "This must not reach the API."}])
+    db.dispose()

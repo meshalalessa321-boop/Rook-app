@@ -11,7 +11,7 @@ services:
     autoDeploy: true
     envVars:
       - key: MERIDIAN_ACCESS_TOKEN
-        generateValue: true
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
