@@ -1,0 +1,63 @@
+name: Publish trained Rook upgrade
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-rook-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out model export code
+        uses: actions/checkout@v4
+        with:
+          ref: rook-upgrade-experiment-v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download the successful training checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 40096586165 --repo ${{ github.repository }} --name rook-brain-checkpoint-110 --dir /tmp/rook-checkpoint
+          test -s /tmp/rook-checkpoint/conversation-best.pt
+          mkdir -p training/artifacts/rook-brain
+          cp /tmp/rook-checkpoint/conversation-best.pt training/artifacts/rook-brain/conversation-best.pt
+
+      - name: Install export and browser runtime dependencies
+        run: |
+          python -m pip install -r training/requirements.txt
+          python -m pip install onnx onnxruntime numpy
+
+      - name: Export and validate the trained 49.5M-parameter model
+        run: python training/export_rook_brain_onnx.py
+
+      - name: Upload verified browser model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-upgraded-browser-model
+          path: |
+            models/rook-brain.onnx
+            rook-status/brain.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish model and metadata as release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="rook-brain-upgrade-2026-10-24"
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "Rook Brain 49.5M Upgrade" --notes "From-scratch 49,566,080-parameter byte Transformer. Trained on WikiText-103 and fine-tuned on OpenAssistant. No pretrained weights or external inference API. ONNX runtime smoke tests passed; generated samples and validation loss are not proof of coherent conversation."
+          gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --repo "${{ github.repository }}"
