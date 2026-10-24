@@ -18,7 +18,7 @@ API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MAX_FILES, MAX_FILE_CHARS, MAX_TOTAL_CHARS = 60, 10000, 100000
 SKIP_PARTS = {".git", ".venv", "venv", "node_modules", "__pycache__", "data", "checkpoints", "weights", "dist", "build", ".next", ".pytest_cache"}
 ALLOWED_SUFFIXES = {".py", ".md", ".yml", ".yaml", ".toml", ".json", ".jsonl", ".txt", ".sh"}
-EXCLUDED_NAMES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "user_corrections.jsonl", "manifest.jsonl"}
+EXCLUDED_NAMES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "user_corrections.jsonl"}
 PRIORITY_PATHS = [
     "training/ROOK_TRAINING_OBJECTIVE.md", "training/README.md", "training/rook_brain.py",
     "training/test_rook_brain.py", "training/corpus/README.md", ".github/workflows/rook-training.yml",
