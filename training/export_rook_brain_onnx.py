@@ -20,7 +20,7 @@ CTX = 256
 
 def main():
     if not CHECKPOINT.is_file():
-        raise SystemExit(f"Missing full-sequence-pretrained Rook checkpoint: {CHECKPOINT}. Run finetune_rook_conversation.py after pretraining.")
+        raise SystemExit(f"Missing full-sequence-pretrained Rook checkpoint: {CHECKPOINT}. Run rook_brain.py to create the full-sequence checkpoint.")
     checkpoint = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
     cfg = checkpoint.get("config", {})
     if cfg.get("vocab") != V or cfg.get("ctx") != CTX:
