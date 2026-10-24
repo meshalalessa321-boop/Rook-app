@@ -12,7 +12,7 @@ import torch
 from train_rook_next import PAD, BOS, EOS, V, Rook
 
 REPO = Path(__file__).resolve().parents[1]
-CHECKPOINT = REPO / "training" / "artifacts" / "rook-brain" / "conversation-best.pt"
+CHECKPOINT = REPO / "training" / "artifacts" / "rook-brain" / "best.pt"
 MODEL_OUT = REPO / "models" / "rook-brain.onnx"
 MANIFEST_OUT = REPO / "rook-status" / "brain.json"
 CTX = 256
@@ -20,7 +20,7 @@ CTX = 256
 
 def main():
     if not CHECKPOINT.is_file():
-        raise SystemExit(f"Missing conversationally fine-tuned Rook checkpoint: {CHECKPOINT}. Run finetune_rook_conversation.py after pretraining.")
+        raise SystemExit(f"Missing full-sequence-pretrained Rook checkpoint: {CHECKPOINT}. Run finetune_rook_conversation.py after pretraining.")
     checkpoint = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
     cfg = checkpoint.get("config", {})
     if cfg.get("vocab") != V or cfg.get("ctx") != CTX:
@@ -79,8 +79,8 @@ def main():
         "status": "verified",
         "model": "./models/rook-brain.onnx",
         "format": "ONNX",
-        "source_checkpoint": "training/artifacts/rook-brain/conversation-best.pt",
-        "stage": checkpoint.get("stage", "unknown"),
+        "source_checkpoint": "training/artifacts/rook-brain/best.pt",
+        "stage": "full_sequence_pretraining",
         "finetune_steps": int(checkpoint.get("finetune_steps", 0)),
         "training_step": int(checkpoint["step"]),
         "validation_loss": float(checkpoint["val_loss"]),
