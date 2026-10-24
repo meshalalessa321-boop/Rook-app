@@ -1,0 +1,46 @@
+{
+  "status": "verified",
+  "model": "./models/rook-brain.onnx",
+  "format": "ONNX",
+  "source_checkpoint": "training/artifacts/rook-brain/conversation-best.pt",
+  "stage": "conversational_finetuning",
+  "finetune_steps": 1000,
+  "training_step": 5500,
+  "validation_loss": 2.0925206551613087,
+  "objective": "full-sequence next-token prediction",
+  "config": {
+    "d": 384,
+    "layers": 8,
+    "heads": 6,
+    "ctx": 256,
+    "vocab": 259,
+    "position_scheme": "prefix-right-pad-v2"
+  },
+  "parameters": 14394240,
+  "pretrained_weights": false,
+  "external_inference_api": false,
+  "position_scheme": "prefix-right-pad-v2",
+  "input": {
+    "name": "tokens",
+    "dtype": "int64",
+    "shape": [
+      1,
+      256
+    ]
+  },
+  "output": {
+    "name": "logits",
+    "dtype": "float32",
+    "shape": [
+      1,
+      256,
+      259
+    ]
+  },
+  "model_bytes": 60677773,
+  "model_sha256": "8ea66445cf9a4e5d71f178a0c43eaeaa401d59ef80f345e886d789c88c66b2ed",
+  "tensor_smoke_test": "passed",
+  "autoregressive_smoke_test": "passed",
+  "sample_for_test_prompt": " The are son a serves of",
+  "quality_note": "Runtime checks verify execution only. Review the generated sample and held-out test loss before treating this as conversationally capable."
+}
