@@ -97,6 +97,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Upload browser ONNX model and metadata
+        if: success() && hashFiles('models/rook-brain.onnx') != '' && hashFiles('rook-status/brain.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: rook-brain-browser-model-${{ github.run_number }}
+          path: |
+            models/rook-brain.onnx
+            rook-status/brain.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload best checkpoint
         if: success() && hashFiles('training/artifacts/rook-brain/best.pt') != ''
         uses: actions/upload-artifact@v4
@@ -107,7 +118,7 @@ jobs:
           retention-days: 30
 
       - name: Publish verified model as a stable browser-download release
-        if: success() && github.ref == 'refs/heads/main'
+        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rook-upgrade-experiment-v2')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -120,7 +131,7 @@ jobs:
           gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --clobber
 
       - name: Publish browser model on a stable raw-content branch
-        if: success() && github.ref == 'refs/heads/main'
+        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rook-upgrade-experiment-v2')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
