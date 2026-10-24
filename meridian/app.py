@@ -101,7 +101,7 @@ def record(x):
         answer[col.name]=value.isoformat() if isinstance(value,datetime) else value
     return answer
 
-async def recent_memories(limit=12):
+def recent_memories(limit=12):
     with Session() as s:
         rows=list(s.scalars(select(Memory).order_by(Memory.created_at.desc()).limit(limit)))
     return [{"title":m.title,"content":m.content,"category":m.category,"verified":m.verified,"source_url":m.source_url} for m in rows]
