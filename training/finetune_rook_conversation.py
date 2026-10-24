@@ -55,7 +55,9 @@ def main():
     random.seed(1701)
     torch.manual_seed(1701)
     OUT.mkdir(parents=True, exist_ok=True)
-    base_path = CONVERSATION if CONVERSATION.exists() else BASE
+    # Always fine-tune the freshly updated base model from this workflow run.
+    # Reusing an older conversation checkpoint would ignore today's base training.
+    base_path = BASE
     if not base_path.exists():
         raise SystemExit("No from-scratch Rook checkpoint found. Run rook_brain.py first.")
     checkpoint = torch.load(base_path, map_location="cpu", weights_only=False)
