@@ -1,6 +1,11 @@
 import os
+import sys
+from pathlib import Path
+
 os.environ.setdefault("MERIDIAN_ACCESS_TOKEN", "test-token-that-is-long-enough-for-the-owner")
 os.environ.setdefault("WORKER_ENABLED", "false")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import pytest
 import app as meridian
 
