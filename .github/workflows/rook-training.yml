@@ -9,6 +9,8 @@ on:
     paths:
       - ".github/workflows/rook-training.yml"
       - "training/rook_brain.py"
+      - "training/finetune_rook_conversation.py"
+      - "training/train_rook_next.py"
       - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
       - "training/test_rook_brain.py"
@@ -63,6 +65,9 @@ jobs:
       - name: Train Rook from random initialization or resume his own checkpoint
         run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
 
+      - name: Teach Rook to answer real conversations
+        run: python training/finetune_rook_conversation.py --steps 1000 --batch 8
+
       - name: Install ONNX export and browser-runtime test dependencies
         run: python -m pip install onnx onnxruntime numpy
 
@@ -86,6 +91,7 @@ jobs:
           name: rook-brain-report-${{ github.run_number }}
           path: |
             training/artifacts/rook-brain/report.json
+            training/artifacts/rook-brain/conversation-report.json
             training/artifacts/rook-brain/corpus_audit.json
             training/artifacts/rook-brain/dataset_manifest.json
           if-no-files-found: warn
@@ -96,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rook-brain-checkpoint-${{ github.run_number }}
-          path: training/artifacts/rook-brain/best.pt
+          path: training/artifacts/rook-brain/conversation-best.pt
           if-no-files-found: error
           retention-days: 30
 
