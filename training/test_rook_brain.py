@@ -33,5 +33,20 @@ class RookBrainTests(unittest.TestCase):
         self.assertFalse(valid_ids & test_ids)
         self.assertEqual(len(train) + len(valid) + len(test), len(docs))
 
+    def test_training_does_not_launch_assistant_only_finetuning(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent
+        brain_source = (root / "rook_brain.py").read_text(encoding="utf-8")
+        workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
+        self.assertNotIn("finetune_rook_conversation.py", brain_source)
+        self.assertNotIn("python training/finetune_rook_conversation.py", workflow)
+
+    def test_exporter_uses_full_sequence_checkpoint(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent
+        source = (root / "export_rook_brain_onnx.py").read_text(encoding="utf-8")
+        self.assertIn('"best.pt"', source)
+        self.assertNotIn('"conversation-best.pt"', source)
+
 if __name__ == "__main__":
     unittest.main()
