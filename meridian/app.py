@@ -115,6 +115,26 @@ def safe_source_url(value):
     if parsed.scheme not in ("http","https") or not parsed.netloc: return ""
     return value[:1000]
 
+def set_task_control(task_id, action):
+    if action not in ("pause", "resume"):
+        raise ValueError("Action must be pause or resume")
+    with Session() as s:
+        task=s.get(Task,task_id)
+        if not task:
+            raise LookupError("Task not found")
+        if action=="pause" and task.status=="queued":
+            task.status="paused"
+            task.next_action="Paused by owner; resume when ready."
+        elif action=="resume" and task.status=="paused":
+            task.status="queued"
+            task.next_action="Waiting for worker to pick up the task."
+        else:
+            raise ValueError("Only queued tasks can be paused and only paused tasks can be resumed.")
+        task.updated_at=now()
+        s.commit()
+        s.refresh(task)
+        return record(task)
+
 def daily_model_calls_used():
     with Session() as s:
         row=s.get(DailyUsage,now().date().isoformat())
@@ -418,6 +438,17 @@ async def add_task(data:TaskInput,_:bool=Depends(owner)):
     with Session() as s:
         x=Task(title=data.title,goal=data.goal,priority=data.priority if data.priority in ("low","normal","high") else "normal")
         s.add(x);s.commit();s.refresh(x);return record(x)
+class TaskControlInput(BaseModel):
+    action:str=Field(pattern="^(pause|resume)$")
+@app.post("/api/tasks/{task_id}/control")
+async def control_task(task_id:str,data:TaskControlInput,_:bool=Depends(owner)):
+    try:
+        return set_task_control(task_id,data.action)
+    except LookupError as exc:
+        raise HTTPException(404,str(exc))
+    except ValueError as exc:
+        raise HTTPException(409,str(exc))
+
 @app.get("/api/memories")
 async def memories(_:bool=Depends(owner)):
     with Session() as s:return [record(x) for x in s.scalars(select(Memory).order_by(Memory.created_at.desc()).limit(200))]

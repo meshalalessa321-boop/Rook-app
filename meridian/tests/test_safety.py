@@ -160,3 +160,25 @@ def test_restart_recovery_requeues_tasks_and_unlocks_approvals(monkeypatch, tmp_
         assert session.get(Run, "run-running").finished_at is not None
         assert session.get(Approval, "approval-publishing").status == "pending"
     db.dispose()
+
+
+def test_task_pause_and_resume_is_persistent(monkeypatch, tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app import Base, Task, set_task_control
+    db = create_engine("sqlite:///" + str(tmp_path / "task-control.db"))
+    Base.metadata.create_all(db)
+    local_session = sessionmaker(db, expire_on_commit=False)
+    monkeypatch.setattr(meridian, "Session", local_session)
+    with local_session() as session:
+        session.add(Task(id="pause-me", title="Pause me", goal="test", status="queued"))
+        session.commit()
+    paused=set_task_control("pause-me","pause")
+    assert paused["status"]=="paused"
+    with pytest.raises(ValueError, match="Only queued tasks"):
+        set_task_control("pause-me","pause")
+    resumed=set_task_control("pause-me","resume")
+    assert resumed["status"]=="queued"
+    with local_session() as session:
+        assert session.get(Task,"pause-me").status=="queued"
+    db.dispose()
