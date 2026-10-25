@@ -182,3 +182,36 @@ def test_task_pause_and_resume_is_persistent(monkeypatch, tmp_path):
     with local_session() as session:
         assert session.get(Task,"pause-me").status=="queued"
     db.dispose()
+
+
+def test_chat_agent_uses_tools_and_records_evidence(monkeypatch, tmp_path):
+    import json
+    from types import SimpleNamespace
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app import Base, Task, Run, run_chat_agent
+    db = create_engine("sqlite:///" + str(tmp_path / "chat-tools.db"))
+    Base.metadata.create_all(db)
+    local_session = sessionmaker(db, expire_on_commit=False)
+    monkeypatch.setattr(meridian, "Session", local_session)
+    call = SimpleNamespace(
+        id="call-create-task",
+        function=SimpleNamespace(name="create_task", arguments=json.dumps({
+            "title":"Inspect tokenizer",
+            "goal":"Find whether Rook's tokenizer handles unknown characters.",
+            "priority":"normal"
+        }))
+    )
+    first = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None, tool_calls=[call]))])
+    second = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="I queued the tokenizer investigation.", tool_calls=None))])
+    responses = iter([first, second])
+    monkeypatch.setattr(meridian, "model_call", lambda messages, tools=None: next(responses))
+    answer = run_chat_agent([{"role":"user","content":"Inspect the tokenizer"}], "message-1")
+    assert "queued" in answer
+    with local_session() as session:
+        task=session.query(Task).filter_by(title="Inspect tokenizer").one()
+        assert task.status=="queued"
+        run=session.query(Run).filter_by(task_id="chat:message-1").one()
+        assert run.status=="done"
+        assert "create_task" in run.evidence
+    db.dispose()

@@ -30,7 +30,7 @@ async function show(nextPage){
    '</div>';
   }else if(page==="chat"){
    const messages=await api("/api/messages");
-   target.innerHTML=card("Conversation",'You can ask for analysis, request plans, and discuss engineering tasks. Use Task Queue to run work in the background.<div id="chatlog" class="chatlog">'+messages.map(m=>'<div class="bubble '+(m.role==="user"?"user":"")+'"><div class="label">'+esc(m.role)+" · "+esc(m.created_at)+'</div>'+esc(m.content)+'</div>').join("")+'</div><form id="chatform" class="form"><textarea id="message" placeholder="Describe what you want Meridian to investigate…" required></textarea><button class="primary">Send message</button></form>');
+   target.innerHTML=card("Conversation",'Ask Meridian to inspect Rook\'s code, remember a decision, create a queued task, or propose a change. Long-running work belongs in Task Queue; proposed code still requires approval.<div id="chatlog" class="chatlog">'+messages.map(m=>'<div class="bubble '+(m.role==="user"?"user":"")+'"><div class="label">'+esc(m.role)+" · "+esc(m.created_at)+'</div>'+esc(m.content)+'</div>').join("")+'</div><form id="chatform" class="form"><textarea id="message" placeholder="Describe what you want Meridian to investigate…" required></textarea><button class="primary">Send message</button></form>');
    $("#chatlog").scrollTop=$("#chatlog").scrollHeight;
    $("#chatform").onsubmit=async e=>{e.preventDefault();const btn=e.submitter;const input=$("#message");const message=input.value.trim();if(!message)return;btn.disabled=true;try{await api("/api/chat",{method:"POST",body:JSON.stringify({message:message})});await show("chat")}catch(err){alert(err.message)}finally{btn.disabled=false}};
   }else if(page==="tasks"){
