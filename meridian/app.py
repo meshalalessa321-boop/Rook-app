@@ -84,6 +84,8 @@ class DailyUsage(Base):
 
 TOKEN=os.getenv("MERIDIAN_ACCESS_TOKEN","")
 MODEL=os.getenv("OPENAI_MODEL","gpt-5.4-mini")
+GROQ_MODEL=os.getenv("GROQ_MODEL","openai/gpt-oss-20b")
+GROQ_BASE_URL=os.getenv("GROQ_BASE_URL","https://api.groq.com/openai/v1")
 ALLOWED_REPOS={p.strip() for p in os.getenv("GITHUB_ALLOWED_REPOS","meshalalessa321-boop/Rook-app").split(",") if p.strip()}
 WORKER_ENABLED=os.getenv("WORKER_ENABLED","true").lower() in ("true","1","yes")
 POLL_SECONDS=max(3,min(60,int(os.getenv("WORKER_POLL_SECONDS","5"))))
@@ -293,9 +295,19 @@ def model_call(messages,tools=None):
                 raise RuntimeError(f"Meridian daily model-call limit reached ({MAX_DAILY_MODEL_CALLS}). Set a provider spending limit before raising this cap.")
             usage.calls+=1
             s.commit()
-    kwargs={"model":MODEL,"messages":messages,"max_completion_tokens":MAX_COMPLETION_TOKENS,"parallel_tool_calls":False}
-    if tools: kwargs.update(tools=tools,tool_choice="auto")
-    response=OpenAI(api_key=os.getenv("OPENAI_API_KEY"),timeout=45.0,max_retries=1).chat.completions.create(**kwargs)
+    groq_key=os.getenv("GROQ_API_KEY","").strip()
+    openai_key=os.getenv("OPENAI_API_KEY","").strip()
+    if groq_key:
+        client=OpenAI(api_key=groq_key,base_url=GROQ_BASE_URL,timeout=45.0,max_retries=1)
+        model=GROQ_MODEL
+    elif openai_key:
+        client=OpenAI(api_key=openai_key,timeout=45.0,max_retries=1)
+        model=MODEL
+    else:
+        raise RuntimeError("No model provider key configured. Set GROQ_API_KEY or OPENAI_API_KEY.")
+    kwargs={"model":model,"messages":messages,"max_tokens":MAX_COMPLETION_TOKENS}
+    if tools: kwargs.update(tools=tools,tool_choice="auto",parallel_tool_calls=False)
+    response=client.chat.completions.create(**kwargs)
     if response.usage:
         with USAGE_LOCK:
             with Session() as s:
@@ -554,7 +566,7 @@ def run_chat_agent(messages, message_id):
 
 @app.post("/api/chat")
 async def chat(data:ChatInput,_:bool=Depends(owner)):
-    if not os.getenv("OPENAI_API_KEY"):raise HTTPException(503,"OPENAI_API_KEY is not configured on the server.")
+    if not (os.getenv("GROQ_API_KEY","").strip() or os.getenv("OPENAI_API_KEY","").strip()):raise HTTPException(503,"No model provider key is configured. Set GROQ_API_KEY or OPENAI_API_KEY on the server.")
     with Session() as s:
         user_message=Message(role="user",content=data.message)
         s.add(user_message);s.commit();s.refresh(user_message)
