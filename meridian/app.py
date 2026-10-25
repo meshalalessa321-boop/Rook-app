@@ -414,6 +414,27 @@ def recover_interrupted_work():
 async def startup():
     Base.metadata.create_all(engine)
     recover_interrupted_work()
+    # Seed the initial mission once per database so Meridian begins with a concrete task.
+    with Session() as s:
+        existing = s.scalars(select(Task).where(Task.title == "Rook: inspect and improve the language model")).first()
+        if existing is None:
+            s.add(Task(
+                title="Rook: inspect and improve the language model",
+                priority="high",
+                goal=(
+                    "Follow meridian/ROOK_TRAINING_MISSION.md as the governing specification. "
+                    "Rook must only learn to generate coherent language and conversation from his own randomly initialized and trained weights. "
+                    "Do not turn him into an assistant or impose a persona, and never tell him he is an AI in prompts or training data. "
+                    "First inspect the real training model, architecture/parameter count, tokenizer/vocabulary, context length, corpus provenance and token count, "
+                    "training workflow, checkpoints, and evaluation metrics. Establish a reproducible baseline and record evidence. "
+                    "Then identify the best safe, reversible model upgrade, considering parameter count, vocabulary/tokenization, data tokens, context length, "
+                    "and training configuration against available compute. Preserve existing checkpoints. Do not launch expensive or destructive work without evidence. "
+                    "If the approved Rook Brain training workflow is appropriate, dispatch only that allow-listed workflow and verify its run and report. "
+                    "Never claim training or improvement without verified run artifacts and comparative metrics. "
+                    "If credentials, repository access, corpus, or compute block progress, report the exact blocker and next concrete action."
+                )
+            ))
+            s.commit()
     asyncio.create_task(worker_loop())
 
 @app.get("/health")
