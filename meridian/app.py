@@ -1,4 +1,4 @@
-import os, json, uuid, base64, asyncio, hmac
+import os, json, uuid, base64, asyncio, hmac, logging
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -9,6 +9,9 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("meridian")
 from sqlalchemy import create_engine, String, Text, Boolean, DateTime, Integer, select, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -319,6 +322,7 @@ def model_call(messages,tools=None):
     return response
 
 async def run_task(task_id,goal):
+    logger.info("worker_task_started task_id=%s", task_id)
     with Session() as s:
         run=Run(task_id=task_id,status="running",summary="Started",evidence="")
         s.add(run);s.commit();s.refresh(run);runid=run.id
@@ -367,7 +371,9 @@ async def run_task(task_id,goal):
             elif step_limit_hit: task.next_action="Continue in a smaller task; the tool-step safety limit was reached."
             else: task.next_action="Inspect the run report and evidence."
             s.commit()
+        logger.info("worker_task_finished task_id=%s status=%s tool_errors=%s tools_used=%s step_limit_hit=%s", task_id, run_status, tool_errors, did_use_tools, step_limit_hit)
     except Exception as exc:
+        logger.exception("worker_task_failed task_id=%s error_type=%s", task_id, type(exc).__name__)
         state["last_error"]=str(exc)[:500]
         with Session() as s:
             run=s.get(Run,runid);run.status="failed";run.summary=str(exc)[:2000];run.evidence="\n".join(evidence)[:20000];run.finished_at=now()
@@ -414,10 +420,22 @@ def recover_interrupted_work():
 async def startup():
     Base.metadata.create_all(engine)
     recover_interrupted_work()
+    logger.info(
+        "meridian_startup database_backend=%s database_url_configured=%s worker_enabled=%s model_provider_ready=%s github_token_configured=%s allowed_repo_count=%s",
+        "postgresql" if DB_URL.startswith("postgresql") else "sqlite",
+        bool(os.getenv("DATABASE_URL")),
+        WORKER_ENABLED,
+        bool(os.getenv("GROQ_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip()),
+        bool(os.getenv("GITHUB_TOKEN", "").strip()),
+        len(ALLOWED_REPOS),
+    )
+    if DB_URL.startswith("sqlite") and "/tmp/" in DB_URL:
+        logger.warning("meridian_database_ephemeral sqlite_path=%s queued_tasks_and_run_history_may_be_lost_on_restart", DB_URL.replace("sqlite:///", ""))
     # Seed the initial mission once per database so Meridian begins with a concrete task.
     with Session() as s:
         existing = s.scalars(select(Task).where(Task.title == "Rook: inspect and improve the language model")).first()
         if existing is None:
+            logger.info("rook_inspection_task_seeded")
             s.add(Task(
                 title="Rook: inspect and improve the language model",
                 priority="high",
@@ -435,7 +453,10 @@ async def startup():
                 )
             ))
             s.commit()
+        else:
+            logger.info("rook_inspection_task_already_exists task_id=%s status=%s", existing.id, existing.status)
     asyncio.create_task(worker_loop())
+    logger.info("meridian_worker_loop_scheduled poll_seconds=%s max_steps=%s", POLL_SECONDS, MAX_STEPS)
 
 @app.get("/health")
 def health(): return {"ok":True}
