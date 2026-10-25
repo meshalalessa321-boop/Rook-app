@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: meridian-engineer
+    runtime: python
+    rootDir: meridian
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    plan: 0.5c-512mb
+    region: singapore
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MERIDIAN_ACCESS_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.4-mini
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_ALLOWED_REPOS
+        value: meshalalessa321-boop/Rook-app
+      - key: DATABASE_URL
+        fromDatabase:
+          name: meridian-db
+          property: connectionString
+      - key: WORKER_ENABLED
+        value: "true"
+      - key: WORKER_POLL_SECONDS
+        value: "5"
+      - key: WORKER_MAX_TOOL_STEPS
+        value: "10"
+      - key: MAX_COMPLETION_TOKENS
+        value: "2500"
+      - key: MAX_DAILY_MODEL_CALLS
+        value: "60"
+      - key: MAX_CHAT_TOOL_STEPS
+        value: "5"
+databases:
+  - name: meridian-db
+    databaseName: meridian
+    user: meridian
+    plan: 0.1c-256mb
+    region: singapore
+    postgresMajorVersion: "16"
+    ipAllowList: []
