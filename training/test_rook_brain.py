@@ -38,8 +38,14 @@ class RookBrainTests(unittest.TestCase):
         root = Path(__file__).resolve().parent
         brain_source = (root / "rook_brain.py").read_text(encoding="utf-8")
         workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
+        import re
         self.assertNotIn("finetune_rook_conversation.py", brain_source)
-        self.assertNotIn("python training/finetune_rook_conversation.py", workflow)
+        # Check actual workflow invocation lines, not safeguard assertions that
+        # mention the forbidden command text as a string literal.
+        self.assertIsNone(re.search(
+            r"(?m)^\s*run:\s*python\s+training/finetune_rook_conversation\.py(?:\s|$)",
+            workflow,
+        ))
 
     def test_exporter_uses_full_sequence_checkpoint(self):
         from pathlib import Path
