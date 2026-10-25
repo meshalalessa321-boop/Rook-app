@@ -21,7 +21,8 @@ permissions:
 
 concurrency:
   group: rook-brain-training
-  cancel-in-progress: true
+  # Never terminate a costly training run just because a follow-up commit arrives.
+  cancel-in-progress: false
 
 jobs:
   train:
@@ -65,7 +66,17 @@ jobs:
         run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
 
       - name: Confirm assistant-only fine-tuning is disabled
-        run: python -c "from pathlib import Path; p=Path('training/rook_brain.py').read_text(); assert 'finetune_rook_conversation.py' not in p; print('PASS: no assistant-only fine-tuning stage is launched')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          brain = Path("training/rook_brain.py").read_text(encoding="utf-8")
+          workflow = Path(".github/workflows/rook-training.yml").read_text(encoding="utf-8")
+          assert "finetune_rook_conversation.py" not in brain
+          assert "python training/finetune_rook_conversation.py" not in workflow
+          print("PASS: no assistant-only fine-tuning stage is launched")
+          PY
 
       - name: Install ONNX export and browser-runtime test dependencies
         run: python -m pip install onnx onnxruntime numpy
