@@ -34,6 +34,8 @@ services:
         value: "2500"
       - key: MAX_DAILY_MODEL_CALLS
         value: "60"
+      - key: MAX_CHAT_TOOL_STEPS
+        value: "5"
 databases:
   - name: meridian-db
     databaseName: meridian

@@ -8,7 +8,7 @@ Meridian is a private engineering command center with durable tasks, persistent 
 - PostgreSQL persistence on the host; SQLite is available for local development.
 - Separate records for tasks, memories, messages, run logs, and approvals.
 - Worker polling loop, restart recovery for interrupted tasks, bounded tool steps, run evidence, and an explicit waiting-for-model state when no model key is configured, a persisted daily model-call cap, output-token limits, and request timeouts.
-- Model tools to read/list files from the allow-listed GitHub repository, search paths, create tasks, save memories, and submit proposed file replacements.
+- Chat and background tasks can use bounded tools to inspect/list/search the allow-listed GitHub repository, create tasks, save durable memory, and submit proposed file replacements. Queued tasks can be paused and resumed from the dashboard.
 - A narrowly allow-listed remote test tool that can trigger only the existing Rook sample-generation workflow on main and inspect the real GitHub Actions result. It cannot dispatch Rook training or publishing workflows, arbitrary workflows, or shell commands.
 - No direct model-controlled repository writes. Owner approval creates a separate branch and draft pull request. There is no automatic merge.
 - GitHub and model API credentials are read only from server-side environment secrets.
@@ -24,7 +24,7 @@ The root render.yaml blueprint describes an always-on web service and a small Po
 
 The web service costs $7/month and the small Postgres compute plan costs $6/month, for a baseline of about $13/month before optional storage or model usage. The current default model is gpt-5.4-mini. OpenAI's published rates are $0.75 per million input tokens and $4.50 per million output tokens; actual cost depends on task size and model output. The application also caps output tokens per request and defaults to 60 model calls per UTC day. Provider-side budget limits are still recommended. Sources: https://render.com/pricing and https://developers.openai.com/api/docs/models/gpt-5.4-mini.
 
-The code and Blueprint do not create paid resources by themselves. The initial Blueprint flow asks for MERIDIAN_ACCESS_TOKEN, OPENAI_API_KEY, and GITHUB_TOKEN. Set the owner token to a strong random value and save it securely. The code and Blueprint do not create paid resources by themselves. Apply the Blueprint in the intended Render workspace after reviewing the estimated monthly cost.
+The initial Blueprint flow asks for MERIDIAN_ACCESS_TOKEN, OPENAI_API_KEY, and GITHUB_TOKEN. Set the owner token to a strong random value and save it securely. Applying the Blueprint provisions paid resources, so review the estimated monthly cost and choose the intended Render workspace first.
 
 Server-side environment:
 - MERIDIAN_ACCESS_TOKEN: provide a strong random secret during Blueprint creation; it is the token entered on Meridian's login screen.
@@ -32,6 +32,7 @@ Server-side environment:
 - OPENAI_MODEL: defaults to gpt-5.4-mini; can be changed in server settings.
 - MAX_COMPLETION_TOKENS: response-token ceiling (default 2500).
 - MAX_DAILY_MODEL_CALLS: daily model request limit (default 60).
+- MAX_CHAT_TOOL_STEPS: maximum tool calls per chat response (default 5).
 - GITHUB_TOKEN: a fine-grained token restricted to this repository. Grant Contents read/write and Pull requests write for owner-approved draft PRs, plus Actions write to dispatch the one approved sampling test. Do not grant repository administration.
 - DATABASE_URL: injected from the linked Render Postgres instance.
 
