@@ -27,7 +27,7 @@ Do not simply resume the old worker with more steps or remove the word `Assistan
 
 ## Current state
 
-The existing model/checkpoints from the old assistant-response objective are preserved as historical artifacts and are not resumed by the new pipeline. The new `rook_brain.py` pipeline uses full-sequence next-token prediction and resumes only checkpoints with a matching configuration and corpus fingerprint. The scheduled workflow must not invoke `finetune_rook_conversation.py`; that legacy answer-only fine-tuning path is intentionally excluded. The first successful run and evaluation report are still required before claiming training is operating correctly. The initial English encyclopedia corpus is a starting point, not a complete or diverse conversational corpus.
+The existing model/checkpoints from the old assistant-response objective are preserved as historical artifacts and are not resumed by the new pipeline. The new `rook_brain.py` pipeline uses full-sequence next-token prediction and resumes only checkpoints with a matching configuration and corpus fingerprint. The scheduled workflow must not invoke `finetune_rook_conversation.py`; that legacy answer-only fine-tuning path is intentionally excluded. The corpus builder now combines WikiText-2 with a bounded English OpenAssistant transcript subset (CC BY 4.0). This is a more relevant starting mixture, but the model remains small and must pass held-out and multi-turn evaluation before we can claim conversational capability.
 
 
 ## Implemented first replacement component
