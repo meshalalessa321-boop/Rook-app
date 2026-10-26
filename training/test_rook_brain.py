@@ -43,7 +43,7 @@ class RookBrainTests(unittest.TestCase):
         # Check actual workflow invocation lines, not safeguard assertions that
         # mention the forbidden command text as a string literal.
         self.assertIsNone(re.search(
-            r"(?m)^\s*run:\s*python\s+training/finetune_rook_conversation\.py(?:\s|$)",
+            r"(?m)^\s*(?:run:\s*)?python\s+training/finetune_rook_conversation\.py(?:\s|$)",
             workflow,
         ))
 
