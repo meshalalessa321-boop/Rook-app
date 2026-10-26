@@ -2,6 +2,7 @@ import unittest
 
 from rook_brain import examples, split_docs
 from train_rook_next import BOS, EOS, PAD
+from prepare_conversations import build_transcripts
 
 class RookBrainTests(unittest.TestCase):
     def test_full_sequence_targets_include_text_and_end_token(self):
@@ -46,6 +47,31 @@ class RookBrainTests(unittest.TestCase):
             r"(?m)^\s*(?:run:\s*)?python\s+training/finetune_rook_conversation\.py(?:\s|$)",
             workflow,
         ))
+
+    def test_conversation_corpus_keeps_both_sides_in_full_sequence(self):
+        rows = [
+            {
+                "message_id": "user-1",
+                "parent_id": None,
+                "role": "prompter",
+                "text": "What is language? " * 20,
+                "lang": "en",
+                "deleted": False,
+            },
+            {
+                "message_id": "assistant-1",
+                "parent_id": "user-1",
+                "role": "assistant",
+                "text": "Language is a structured system. " * 20,
+                "lang": "en",
+                "deleted": False,
+            },
+        ]
+        docs = build_transcripts(rows)
+        self.assertEqual(len(docs), 1)
+        transcript = docs[0]["text"]
+        self.assertIn("User: What is language?", transcript)
+        self.assertIn("Assistant: Language is a structured system.", transcript)
 
     def test_exporter_uses_full_sequence_checkpoint(self):
         from pathlib import Path
