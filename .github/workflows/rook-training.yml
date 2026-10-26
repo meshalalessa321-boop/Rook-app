@@ -12,6 +12,7 @@ on:
       - "training/train_rook_next.py"
       - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
+      - "training/prepare_conversations.py"
       - "training/test_rook_brain.py"
       - "training/requirements.txt"
       - "training/corpus/**"
@@ -55,6 +56,9 @@ jobs:
 
       - name: Prepare documented language corpus
         run: python training/prepare_wikitext.py
+
+      - name: Add documented English conversation transcripts
+        run: python training/prepare_conversations.py
 
       - name: Run training pipeline tests
         run: python -m unittest discover -s training -v
