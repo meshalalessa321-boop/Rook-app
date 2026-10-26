@@ -17,7 +17,7 @@ OUT = CORPUS / "conversations"
 MANIFEST = CORPUS / "manifest.jsonl"
 DATASET_ID = "OpenAssistant/oasst1"
 DATASET_URL = "https://huggingface.co/datasets/OpenAssistant/oasst1"
-LICENSE = "CC BY 4.0"
+LICENSE = "Apache-2.0"
 MAX_DOCUMENTS = 2000
 MAX_DOCUMENT_BYTES = 4000
 
@@ -90,7 +90,7 @@ def build_transcripts(rows, limit=MAX_DOCUMENTS):
 
 def main():
     print(f"Loading {DATASET_ID} train split...", flush=True)
-    print("Source license: CC BY 4.0. Conversation turns are trained as full-sequence text.", flush=True)
+    print("Source license: Apache-2.0. Conversation turns are trained as full-sequence text.", flush=True)
     dataset = load_dataset(DATASET_ID, split="train")
     documents = build_transcripts(dataset)
     if len(documents) < 100:
