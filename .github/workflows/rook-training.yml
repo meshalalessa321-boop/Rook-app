@@ -66,8 +66,44 @@ jobs:
       - name: Audit corpus and provenance
         run: python training/rook_brain.py --audit-only
 
+      - name: Select resume mode for this exact corpus
+        id: resume
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import hashlib
+          import sys
+          from pathlib import Path
+          import torch
+
+          sys.path.insert(0, "training")
+          from rook_brain import load_documents
+
+          docs, _ = load_documents()
+          fingerprint = hashlib.sha256(
+              "".join(sorted(doc["sha256"] for doc in docs)).encode("ascii")
+          ).hexdigest()
+          resume = Path("training/artifacts/rook-brain/resume.pt")
+          old_fingerprint = None
+          if resume.is_file():
+              saved = torch.load(resume, map_location="cpu", weights_only=False)
+              old_fingerprint = saved.get("corpus_fingerprint")
+          # A changed or legacy-unfingerprinted corpus starts a fresh model.
+          # Matching corpus fingerprints continue training from Rook's own weights.
+          print("fresh=" + ("true" if resume.is_file() and old_fingerprint != fingerprint else "false"))
+          PY
+
       - name: Train Rook from random initialization or resume his own checkpoint
-        run: python training/rook_brain.py --steps 500 --ctx 256 --batch 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--steps 500 --ctx 256 --batch 4)
+          if [[ "${{ steps.resume.outputs.fresh }}" == "true" ]]; then
+            args+=(--fresh)
+            echo "Corpus changed: starting a new random-initialized checkpoint lineage."
+          fi
+          python training/rook_brain.py "${args[@]}"
 
       - name: Confirm assistant-only fine-tuning is disabled
         shell: bash
