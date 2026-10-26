@@ -77,7 +77,7 @@ jobs:
           workflow = Path(".github/workflows/rook-training.yml").read_text(encoding="utf-8")
           assert "finetune_rook_conversation.py" not in brain
           assert re.search(
-              r"(?m)^\s*run:\s*python\s+training/finetune_rook_conversation\.py(?:\s|$)",
+              r"(?m)^\s*(?:run:\s*)?python\s+training/finetune_rook_conversation\.py(?:\s|$)",
               workflow,
           ) is None, "Assistant-only fine-tuning invocation must stay disabled"
           print("PASS: no assistant-only fine-tuning stage is launched")
