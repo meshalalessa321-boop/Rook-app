@@ -19,7 +19,7 @@ The old script and worker require an explicit `--allow-legacy-assistant-objectiv
 - Track source licenses, deduplication, language distribution, and held-out splits.
 - Evaluate general text continuation, context coherence, language drift, and multi-turn continuity without using “assistant helpfulness” as the target identity.
 
-The replacement pipeline is implemented in `rook_brain.py`. The workflow prepares a documented WikiText-2 corpus plus a bounded English OpenAssistant conversation subset licensed under CC BY 4.0. Both user and assistant turns are ordinary next-token targets in full transcripts; no answer-only loss mask is used. The workflow runs tests and a corpus audit, then trains for 500 additional steps per run while resuming compatible Rook Brain checkpoints. This is still a small experimental corpus and model, not evidence of coherent conversation by itself.
+The replacement pipeline is implemented in `rook_brain.py`. The workflow prepares a documented WikiText-2 corpus plus a bounded English OpenAssistant conversation subset licensed under Apache-2.0. Both user and assistant turns are ordinary next-token targets in full transcripts; no answer-only loss mask is used. The workflow runs tests and a corpus audit, then trains for 500 additional steps per run while resuming compatible Rook Brain checkpoints. This is still a small experimental corpus and model, not evidence of coherent conversation by itself.
 
 ## Identity rule
 
