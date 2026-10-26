@@ -19,7 +19,7 @@ The old script and worker require an explicit `--allow-legacy-assistant-objectiv
 - Track source licenses, deduplication, language distribution, and held-out splits.
 - Evaluate general text continuation, context coherence, language drift, and multi-turn continuity without using “assistant helpfulness” as the target identity.
 
-The replacement pipeline is now implemented in `rook_brain.py`, and the scheduled workflow uses it instead of the retired worker. The workflow prepares a documented WikiText-2 bootstrap corpus, runs tests and a corpus audit, then trains for 500 steps per run while resuming compatible Rook Brain checkpoints. This is an initial language-modeling foundation, not yet a broad conversational corpus; the first run must pass its checks before we can claim successful training.
+The replacement pipeline is implemented in `rook_brain.py`. The workflow prepares a documented WikiText-2 corpus plus a bounded English OpenAssistant conversation subset licensed under CC BY 4.0. Both user and assistant turns are ordinary next-token targets in full transcripts; no answer-only loss mask is used. The workflow runs tests and a corpus audit, then trains for 500 additional steps per run while resuming compatible Rook Brain checkpoints. This is still a small experimental corpus and model, not evidence of coherent conversation by itself.
 
 ## Identity rule
 
@@ -28,4 +28,4 @@ Never place a hidden or explicit instruction in Rook's model context telling him
 
 ## Current training workflow
 
-The GitHub Actions workflow `.github/workflows/rook-training.yml` runs on a daily schedule and can also be started manually. It uses the WikiText-2 training split as a documented English-text bootstrap corpus, predicts the next token across the full sequence, and does not optimize a designated assistant role. Model checkpoints are preserved in the Actions cache and reports/checkpoints are uploaded as run artifacts. The public browser model is not replaced automatically; export and deployment remain a separate, validated step.
+The GitHub Actions workflow `.github/workflows/rook-training.yml` runs on a daily schedule and can also be started manually. It prepares WikiText-2 and English OpenAssistant conversation transcripts, then predicts the next token across every non-padding token in every document. Compatible checkpoints are cached between runs. On a successful run, the workflow exports the exact full-sequence checkpoint, runs ONNX and autoregressive smoke tests, uploads the report/checkpoint, and publishes the verified model to the stable browser-model branch and release. Runtime checks establish that inference works, not that the model is conversationally coherent.
