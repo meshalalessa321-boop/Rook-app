@@ -431,30 +431,38 @@ async def startup():
     )
     if DB_URL.startswith("sqlite") and "/tmp/" in DB_URL:
         logger.warning("meridian_database_ephemeral sqlite_path=%s queued_tasks_and_run_history_may_be_lost_on_restart", DB_URL.replace("sqlite:///", ""))
-    # Seed the initial mission once per database so Meridian begins with a concrete task.
+    # Seed a concrete mission and automatically retry interrupted/blocked missions.
+    # The worker must execute the training workflow, not merely describe a plan.
     with Session() as s:
-        existing = s.scalars(select(Task).where(Task.title == "Rook: inspect and improve the language model")).first()
+        title = "Rook: inspect, train, evaluate, and improve the language model"
+        existing = s.scalars(select(Task).where(Task.title == title)).first()
+        goal = (
+            "MANDATORY EXECUTION, not planning only. Read meridian/ROOK_TRAINING_MISSION.md first. "
+            "Rook must learn language from his own randomly initialized and trained weights. Never use a pretrained model as Rook, "
+            "never add assistant/persona instructions, and never tell him he is an AI in prompts or training data. "
+            "Step 1: inspect the training code, model, tokenizer, corpus, workflow, latest checkpoint and evaluation report. "
+            "Step 2: dispatch the allow-listed rook-training.yml workflow using run_rook_training; do not stop at recommending it. "
+            "Step 3: use check_rook_training on the returned run ID and verify success, report, and checkpoint artifacts. "
+            "Step 4: inspect the report and actual generated samples, compare against prior metrics where available, and identify the highest-impact safe upgrade. "
+            "Step 5: submit justified reversible code changes for owner approval, preserving existing checkpoints, then explain the next experiment. "
+            "Training success alone is not proof of quality improvement; report metrics honestly and never fabricate results. "
+            "If dispatch or verification fails, retry transient errors within the tool-step budget, then record the exact blocker and evidence."
+        )
         if existing is None:
-            logger.info("rook_inspection_task_seeded")
-            s.add(Task(
-                title="Rook: inspect and improve the language model",
-                priority="high",
-                goal=(
-                    "Follow meridian/ROOK_TRAINING_MISSION.md as the governing specification. "
-                    "Rook must only learn to generate coherent language and conversation from his own randomly initialized and trained weights. "
-                    "Do not turn him into an assistant or impose a persona, and never tell him he is an AI in prompts or training data. "
-                    "First inspect the real training model, architecture/parameter count, tokenizer/vocabulary, context length, corpus provenance and token count, "
-                    "training workflow, checkpoints, and evaluation metrics. Establish a reproducible baseline and record evidence. "
-                    "Then identify the best safe, reversible model upgrade, considering parameter count, vocabulary/tokenization, data tokens, context length, "
-                    "and training configuration against available compute. Preserve existing checkpoints. Do not launch expensive or destructive work without evidence. "
-                    "If the approved Rook Brain training workflow is appropriate, dispatch only that allow-listed workflow and verify its run and report. "
-                    "Never claim training or improvement without verified run artifacts and comparative metrics. "
-                    "If credentials, repository access, corpus, or compute block progress, report the exact blocker and next concrete action."
-                )
-            ))
+            logger.info("rook_execution_mission_seeded")
+            s.add(Task(title=title, priority="high", goal=goal, next_action="Inspect mission and training pipeline, then dispatch and verify Rook training."))
+            s.commit()
+        elif existing.status in ("failed", "blocked", "paused"):
+            logger.warning("rook_execution_mission_requeued task_id=%s previous_status=%s", existing.id, existing.status)
+            existing.status = "queued"
+            existing.priority = "high"
+            existing.goal = goal
+            existing.blocker = ""
+            existing.next_action = "Retry the full inspect -> dispatch training -> verify artifacts -> evaluate -> propose upgrade loop."
+            existing.updated_at = now()
             s.commit()
         else:
-            logger.info("rook_inspection_task_already_exists task_id=%s status=%s", existing.id, existing.status)
+            logger.info("rook_execution_mission_present task_id=%s status=%s", existing.id, existing.status)
     asyncio.create_task(worker_loop())
     logger.info("meridian_worker_loop_scheduled poll_seconds=%s max_steps=%s", POLL_SECONDS, MAX_STEPS)
 
