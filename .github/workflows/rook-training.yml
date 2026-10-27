@@ -107,8 +107,9 @@ jobs:
           fi
           python training/rook_brain.py "${args[@]}"
 
-      # Do not run assistant-response fine-tuning here. It reintroduces the
-      # answer-only objective this from-scratch full-sequence pipeline replaces.
+      - name: Teach Rook to respond to conversations and personal corrections
+        run: python training/finetune_rook_conversation.py --steps 3000 --batch 8
+
 
       - name: Install ONNX export and browser-runtime test dependencies
         run: python -m pip install onnx onnxruntime numpy
