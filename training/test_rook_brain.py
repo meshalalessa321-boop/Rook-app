@@ -34,19 +34,12 @@ class RookBrainTests(unittest.TestCase):
         self.assertFalse(valid_ids & test_ids)
         self.assertEqual(len(train) + len(valid) + len(test), len(docs))
 
-    def test_training_does_not_launch_assistant_only_finetuning(self):
+    def test_workflow_trains_conversation_responses_and_user_corrections(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent
-        brain_source = (root / "rook_brain.py").read_text(encoding="utf-8")
         workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
-        import re
-        self.assertNotIn("finetune_rook_conversation.py", brain_source)
-        # Check actual workflow invocation lines, not safeguard assertions that
-        # mention the forbidden command text as a string literal.
-        self.assertIsNone(re.search(
-            r"(?m)^\s*(?:run:\s*)?python\s+training/finetune_rook_conversation\.py(?:\s|$)",
-            workflow,
-        ))
+        self.assertIn("python training/finetune_rook_conversation.py --steps 3000 --batch 8", workflow)
+        self.assertIn('"training/user_corrections.jsonl"', workflow)
 
     def test_conversation_corpus_keeps_both_sides_in_full_sequence(self):
         rows = [
@@ -78,7 +71,8 @@ class RookBrainTests(unittest.TestCase):
         root = Path(__file__).resolve().parent
         source = (root / "export_rook_brain_onnx.py").read_text(encoding="utf-8")
         self.assertIn('"best.pt"', source)
-        self.assertNotIn('"conversation-best.pt"', source)
+        self.assertIn('"conversation-best.pt"', source)
+        self.assertIn('CONVERSATION_CHECKPOINT if CONVERSATION_CHECKPOINT.is_file() else BASE_CHECKPOINT', source)
 
 if __name__ == "__main__":
     unittest.main()
