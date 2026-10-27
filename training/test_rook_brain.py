@@ -34,12 +34,12 @@ class RookBrainTests(unittest.TestCase):
         self.assertFalse(valid_ids & test_ids)
         self.assertEqual(len(train) + len(valid) + len(test), len(docs))
 
-    def test_workflow_trains_conversation_responses_and_user_corrections(self):
+    def test_workflow_never_launches_answer_only_finetuning(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent
         workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
-        self.assertIn("python training/finetune_rook_conversation.py --steps 3000 --batch 8", workflow)
-        self.assertIn('"training/user_corrections.jsonl"', workflow)
+        self.assertNotIn("finetune_rook_conversation", workflow)
+        self.assertIn("python training/prepare_tinystories.py", workflow)
 
     def test_conversation_corpus_keeps_both_sides_in_full_sequence(self):
         rows = [
@@ -63,8 +63,10 @@ class RookBrainTests(unittest.TestCase):
         docs = build_transcripts(rows)
         self.assertEqual(len(docs), 1)
         transcript = docs[0]["text"]
-        self.assertIn("User: What is language?", transcript)
-        self.assertIn("Assistant: Language is a structured system.", transcript)
+        self.assertIn("Person A: What is language?", transcript)
+        self.assertIn("Person B: Language is a structured system.", transcript)
+        self.assertNotIn("Assistant", transcript)
+        self.assertNotIn("User:", transcript)
 
     def test_conversation_candidate_must_beat_base_test_loss(self):
         from pathlib import Path
@@ -79,8 +81,14 @@ class RookBrainTests(unittest.TestCase):
         root = Path(__file__).resolve().parent
         source = (root / "export_rook_brain_onnx.py").read_text(encoding="utf-8")
         self.assertIn('"best.pt"', source)
-        self.assertIn('"conversation-best.pt"', source)
-        self.assertIn('CONVERSATION_CHECKPOINT if CONVERSATION_CHECKPOINT.is_file() else BASE_CHECKPOINT', source)
+        self.assertNotIn("conversation-best.pt", source)
+
+    def test_live_chat_page_uses_neutral_speaker_labels(self):
+        from pathlib import Path
+        page = (Path(__file__).resolve().parent.parent / "rook-talk.html").read_text(encoding="utf-8")
+        self.assertIn("Person A: ", page)
+        self.assertNotIn('"Assistant: "', page)
+        self.assertNotIn("Assistant:\"", page)
 
     def test_lr_schedule_warms_up_then_decays(self):
         from rook_brain import lr_at

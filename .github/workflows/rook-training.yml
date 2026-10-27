@@ -12,9 +12,8 @@ on:
       - "training/train_rook_next.py"
       - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
+      - "training/prepare_tinystories.py"
       - "training/prepare_conversations.py"
-      - "training/finetune_rook_conversation.py"
-      - "training/user_corrections.jsonl"
       - "training/test_rook_brain.py"
       - "training/requirements.txt"
       - "training/corpus/**"
@@ -59,6 +58,9 @@ jobs:
       - name: Prepare documented language corpus
         run: python training/prepare_wikitext.py
 
+      - name: Add documented simple English stories (TinyStories)
+        run: python training/prepare_tinystories.py --max-stories 100000
+
       - name: Add documented English conversation transcripts
         run: python training/prepare_conversations.py
 
@@ -100,7 +102,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--steps 500 --ctx 256 --batch 4)
+          args=(--steps 6000 --ctx 256 --batch 8)
           if [[ "${{ steps.resume.outputs.fresh }}" == "true" ]]; then
             args+=(--fresh)
             echo "Corpus changed: starting a new random-initialized checkpoint lineage."
@@ -135,7 +137,6 @@ jobs:
             training/artifacts/rook-brain/report.json
             training/artifacts/rook-brain/corpus_audit.json
             training/artifacts/rook-brain/dataset_manifest.json
-            training/artifacts/rook-brain/conversation-report.json
           if-no-files-found: warn
           retention-days: 30
 

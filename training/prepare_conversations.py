@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Add a small, licensed English conversation mixture for full-sequence pretraining.
 
-Both user and assistant messages remain ordinary next-token targets. This does
-not perform answer-only fine-tuning and does not prescribe Rook's identity.
+Both sides of every conversation remain ordinary next-token targets. Speakers are
+labelled with neutral names ("Person A" / "Person B"), so no side is cast as an
+assistant. This does not perform answer-only fine-tuning and does not prescribe
+Rook's identity.
 """
 import hashlib
 import json
@@ -36,7 +38,7 @@ def build_transcripts(rows, limit=MAX_DOCUMENTS):
         nodes[node_id] = {
             "id": node_id,
             "parent": str(row.get("parent_id") or "").strip() or None,
-            "role": "User" if role == "prompter" else "Assistant",
+            "role": "Person A" if role == "prompter" else "Person B",
             "text": text,
         }
 
@@ -58,7 +60,7 @@ def build_transcripts(rows, limit=MAX_DOCUMENTS):
 
     roots = [
         node_id for node_id, node in nodes.items()
-        if node["role"] == "User" and node["parent"] not in nodes
+        if node["role"] == "Person A" and node["parent"] not in nodes
     ]
     roots.sort(key=lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest())
 
