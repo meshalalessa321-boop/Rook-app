@@ -136,6 +136,7 @@ jobs:
             training/artifacts/rook-brain/report.json
             training/artifacts/rook-brain/corpus_audit.json
             training/artifacts/rook-brain/dataset_manifest.json
+            training/artifacts/rook-brain/conversation-report.json
           if-no-files-found: warn
           retention-days: 30
 
