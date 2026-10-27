@@ -56,17 +56,13 @@ def main():
     parser.add_argument("--max-stories", type=int, default=50000)
     args = parser.parse_args()
 
-    print(f"Loading {DATASET_ID} train split (streaming)...", flush=True)
+    print(f"Loading the first {args.max_stories} stories of {DATASET_ID} train split...", flush=True)
     print(f"Source license: {LICENSE}. Confirm on the dataset card before redistributing.", flush=True)
-    dataset = load_dataset(DATASET_ID, split="train", streaming=True)
+    # Regular (non-streaming) load: streaming left background threads running and
+    # crashed the interpreter on exit (exit code 134) in GitHub Actions.
+    dataset = load_dataset(DATASET_ID, split=f"train[:{args.max_stories}]")
 
-    def stories():
-        for count, row in enumerate(dataset):
-            if count >= args.max_stories:
-                return
-            yield row.get("text", "")
-
-    shards = shard_stories(stories())
+    shards = shard_stories(row.get("text", "") for row in dataset)
     if len(shards) < 10:
         raise SystemExit(f"Expected at least 10 story shards, got {len(shards)}. Check the dataset schema.")
 
