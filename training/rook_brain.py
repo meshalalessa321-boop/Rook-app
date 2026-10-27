@@ -4,7 +4,7 @@
 This is deliberately NOT instruction tuning. Every non-padding token is a
 next-token target; no speaker role or answer span is privileged.
 """
-import argparse, hashlib, json, random, time, sys
+import argparse, hashlib, json, math, random, time, sys
 from pathlib import Path
 
 import torch
@@ -107,6 +107,14 @@ def evaluate(model, batches, device, limit=500):
             "perplexity": float(torch.exp(torch.tensor(total_loss / max(1, total_tokens))).item()),
             "tokens": total_tokens, "windows": min(len(batches), limit)}
 
+def lr_at(step, base_lr, warmup, total_steps, min_ratio):
+    """Linear warmup, then cosine decay to base_lr * min_ratio. Uses the global step."""
+    if warmup > 0 and step <= warmup:
+        return base_lr * step / warmup
+    span = max(1, total_steps - warmup)
+    progress = min(1.0, max(0.0, (step - warmup) / span))
+    return base_lr * (min_ratio + (1.0 - min_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress)))
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--steps", type=int, default=5000)
@@ -117,6 +125,11 @@ def main():
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--seed", type=int, default=1701)
     p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--dropout", type=float, default=0.1, help="Dropout for training only; 0 disables it.")
+    p.add_argument("--accum", type=int, default=4, help="Micro-batches per optimizer step (effective batch = batch * accum).")
+    p.add_argument("--warmup", type=int, default=200, help="Linear warmup steps, counted from global step 0 (skipped on resume).")
+    p.add_argument("--min-lr-ratio", type=float, default=0.1, help="Final learning rate as a fraction of --lr.")
+    p.add_argument("--total-steps", type=int, default=0, help="Global step where cosine decay ends. Default: start step + --steps.")
     p.add_argument("--audit-only", action="store_true")
     p.add_argument("--smoke", action="store_true", help="Run two tiny steps to validate the pipeline.")
     p.add_argument("--fresh", action="store_true", help="Ignore saved Rook Brain state and start from random weights.")
@@ -149,7 +162,7 @@ def main():
     if a.smoke:
         d, layers, heads, ctx, batch_size, steps = 192, 4, 6, 64, 2, 2
         train, valid, test = examples(train_docs, ctx), examples(val_docs, ctx), examples(test_docs, ctx)
-    model = Rook(d, layers, heads, ctx).to(device)  # fresh random initialization unless a compatible resume exists
+    model = Rook(d, layers, heads, ctx, dropout=a.dropout).to(device)  # fresh random initialization unless a compatible resume exists
     optimizer = torch.optim.AdamW(model.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.1)
     config = {"d":d,"layers":layers,"heads":heads,"ctx":ctx,"vocab":V,"position_scheme":"prefix-right-pad-v2"}
     corpus_fingerprint = hashlib.sha256(
@@ -191,19 +204,29 @@ def main():
               "external_inference_api": False, "objective": "full-sequence next-token prediction",
               "speaker_role_objective": False, "config": config,
               "corpus_fingerprint": corpus_fingerprint,
+              "training": {"lr": a.lr, "dropout": a.dropout, "batch": batch_size, "accum": a.accum,
+                           "warmup": a.warmup, "min_lr_ratio": a.min_lr_ratio},
               "parameters": sum(q.numel() for q in model.parameters()), "corpus": manifest}
     (OUT / "dataset_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    total_steps = a.total_steps if a.total_steps > 0 else start_step + steps
+    accum = 1 if a.smoke else max(1, a.accum)
     for step in range(start_step + 1, start_step + steps + 1):
         model.train()
-        batch = random.choices(train, k=batch_size)
-        x = torch.tensor([r[0] for r in batch], dtype=torch.long, device=device)
-        y = torch.tensor([r[1] for r in batch], dtype=torch.long, device=device)
+        for group in optimizer.param_groups:
+            group["lr"] = lr_at(step, a.lr, a.warmup, total_steps, a.min_lr_ratio)
         optimizer.zero_grad(set_to_none=True)
-        logits = model(x)
-        loss = F.cross_entropy(logits.reshape(-1, V), y.reshape(-1), ignore_index=PAD)
-        if not torch.isfinite(loss):
-            raise RuntimeError("Non-finite training loss.")
-        loss.backward()
+        loss_sum = 0.0
+        for _ in range(accum):
+            batch = random.choices(train, k=batch_size)
+            x = torch.tensor([r[0] for r in batch], dtype=torch.long, device=device)
+            y = torch.tensor([r[1] for r in batch], dtype=torch.long, device=device)
+            logits = model(x)
+            micro = F.cross_entropy(logits.reshape(-1, V), y.reshape(-1), ignore_index=PAD)
+            if not torch.isfinite(micro):
+                raise RuntimeError("Non-finite training loss.")
+            (micro / accum).backward()
+            loss_sum += float(micro.item())
+        loss = torch.tensor(loss_sum / accum)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
         if step == start_step + 1 or step % 100 == 0 or step == start_step + steps:

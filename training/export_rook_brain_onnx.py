@@ -13,16 +13,14 @@ from train_rook_next import PAD, BOS, EOS, V, Rook
 
 REPO = Path(__file__).resolve().parents[1]
 BASE_CHECKPOINT = REPO / "training" / "artifacts" / "rook-brain" / "best.pt"
-CONVERSATION_CHECKPOINT = REPO / "training" / "artifacts" / "rook-brain" / "conversation-best.pt"
 MODEL_OUT = REPO / "models" / "rook-brain.onnx"
 MANIFEST_OUT = REPO / "rook-status" / "brain.json"
 CTX = 256
 
 
 def main():
-    # Prefer the conversation-trained version when this workflow has produced it.
-    # Fall back to the base checkpoint only for explicit export/debug runs.
-    checkpoint_path = CONVERSATION_CHECKPOINT if CONVERSATION_CHECKPOINT.is_file() else BASE_CHECKPOINT
+    # Export only the full-sequence checkpoint. No answer-only fine-tuned variant exists.
+    checkpoint_path = BASE_CHECKPOINT
     if not checkpoint_path.is_file():
         raise SystemExit(f"Missing Rook checkpoint: {checkpoint_path}. Run the training pipeline first.")
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)

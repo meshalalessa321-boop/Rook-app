@@ -34,12 +34,12 @@ class RookBrainTests(unittest.TestCase):
         self.assertFalse(valid_ids & test_ids)
         self.assertEqual(len(train) + len(valid) + len(test), len(docs))
 
-    def test_workflow_trains_conversation_responses_and_user_corrections(self):
+    def test_workflow_never_launches_answer_only_finetuning(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent
         workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
-        self.assertIn("python training/finetune_rook_conversation.py --steps 3000 --batch 8", workflow)
-        self.assertIn('"training/user_corrections.jsonl"', workflow)
+        self.assertNotIn("finetune_rook_conversation", workflow)
+        self.assertIn("python training/prepare_tinystories.py", workflow)
 
     def test_conversation_corpus_keeps_both_sides_in_full_sequence(self):
         rows = [
@@ -63,8 +63,10 @@ class RookBrainTests(unittest.TestCase):
         docs = build_transcripts(rows)
         self.assertEqual(len(docs), 1)
         transcript = docs[0]["text"]
-        self.assertIn("User: What is language?", transcript)
-        self.assertIn("Assistant: Language is a structured system.", transcript)
+        self.assertIn("Person A: What is language?", transcript)
+        self.assertIn("Person B: Language is a structured system.", transcript)
+        self.assertNotIn("Assistant", transcript)
+        self.assertNotIn("User:", transcript)
 
     def test_conversation_candidate_must_beat_base_test_loss(self):
         from pathlib import Path
@@ -79,8 +81,44 @@ class RookBrainTests(unittest.TestCase):
         root = Path(__file__).resolve().parent
         source = (root / "export_rook_brain_onnx.py").read_text(encoding="utf-8")
         self.assertIn('"best.pt"', source)
-        self.assertIn('"conversation-best.pt"', source)
-        self.assertIn('CONVERSATION_CHECKPOINT if CONVERSATION_CHECKPOINT.is_file() else BASE_CHECKPOINT', source)
+        self.assertNotIn("conversation-best.pt", source)
+
+    def test_live_chat_page_uses_neutral_speaker_labels(self):
+        from pathlib import Path
+        page = (Path(__file__).resolve().parent.parent / "rook-talk.html").read_text(encoding="utf-8")
+        self.assertIn("Person A: ", page)
+        self.assertNotIn('"Assistant: "', page)
+        self.assertNotIn("Assistant:\"", page)
+
+    def test_lr_schedule_warms_up_then_decays(self):
+        from rook_brain import lr_at
+        base, warmup, total, floor = 1e-3, 100, 1000, 0.1
+        self.assertAlmostEqual(lr_at(50, base, warmup, total, floor), base * 0.5)
+        self.assertAlmostEqual(lr_at(100, base, warmup, total, floor), base)
+        self.assertLess(lr_at(600, base, warmup, total, floor), base)
+        self.assertAlmostEqual(lr_at(1000, base, warmup, total, floor), base * floor)
+        # After a resume the global step is already past warmup, so no warmup restarts.
+        self.assertGreater(lr_at(5000, base, warmup, 100000, floor), base * 0.9)
+
+    def test_dropout_is_off_in_eval_and_keeps_checkpoint_keys(self):
+        import torch
+        from train_rook_next import Rook
+        plain = Rook(32, 2, 2, 16)
+        dropped = Rook(32, 2, 2, 16, dropout=0.5)
+        self.assertEqual(list(plain.state_dict().keys()), list(dropped.state_dict().keys()))
+        dropped.load_state_dict(plain.state_dict())
+        dropped.eval()
+        plain.eval()
+        x = torch.randint(0, 256, (1, 16))
+        self.assertTrue(torch.allclose(plain(x), dropped(x), atol=1e-6))
+
+    def test_tinystories_shards_keep_every_story_once(self):
+        from prepare_tinystories import shard_stories
+        stories = [(f"Story number {i}. " + "Tom had a red ball. " * 5).strip() for i in range(250)]
+        shards = shard_stories(stories, shard_size=100)
+        self.assertEqual(len(shards), 3)
+        rejoined = "\n\n".join(shards).split("\n\n")
+        self.assertEqual(rejoined, stories)
 
 if __name__ == "__main__":
     unittest.main()
