@@ -66,6 +66,14 @@ class RookBrainTests(unittest.TestCase):
         self.assertIn("User: What is language?", transcript)
         self.assertIn("Assistant: Language is a structured system.", transcript)
 
+    def test_conversation_candidate_must_beat_base_test_loss(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parent / "finetune_rook_conversation.py").read_text(encoding="utf-8")
+        self.assertIn("accepted = test_loss < base_test_loss", source)
+        self.assertIn("candidate_rejected_no_test_improvement", source)
+        self.assertIn("CANDIDATE.replace(CONVERSATION)", source)
+        self.assertIn("CONVERSATION.unlink(missing_ok=True)", source)
+
     def test_exporter_uses_full_sequence_checkpoint(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent
