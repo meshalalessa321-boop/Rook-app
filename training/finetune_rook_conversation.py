@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "artifacts" / "rook-brain"
 BASE = OUT / "best.pt"
 CONVERSATION = OUT / "conversation-best.pt"
+CANDIDATE = OUT / "conversation-candidate.pt"
 OBJECTIVE = "full-sequence next-token prediction"
 
 
@@ -57,6 +58,9 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # Always fine-tune the freshly updated base model from this workflow run.
     # Reusing an older conversation checkpoint would ignore today's base training.
+    # Never let a stale checkpoint survive a rejected or interrupted run.
+    CANDIDATE.unlink(missing_ok=True)
+    CONVERSATION.unlink(missing_ok=True)
     base_path = BASE
     if not base_path.exists():
         raise SystemExit("No from-scratch Rook checkpoint found. Run rook_brain.py first.")
@@ -73,6 +77,8 @@ def main():
     train, valid, test, meta = data(1701)
     if len(train) < 1000 or len(valid) < 20 or len(test) < 20:
         raise SystemExit(f"Conversational dataset split is too small: {meta}")
+    base_test_loss = evaluate(model, test, cfg["ctx"], device)
+    print(json.dumps({"event": "baseline_quality", "base_test_loss": base_test_loss}), flush=True)
     steps = 2 if a.smoke else a.steps
     batch_size = 2 if a.smoke else a.batch
     lr = a.lr
@@ -110,12 +116,20 @@ def main():
                     "stage": "conversational_finetuning",
                     "pretrained_weights": False, "external_inference_api": False,
                     "dataset": "OpenAssistant/oasst1", "dataset_license": "CC BY 4.0",
-                }, CONVERSATION)
-    best = torch.load(CONVERSATION, map_location=device, weights_only=False)
+                }, CANDIDATE)
+    if not CANDIDATE.is_file():
+        raise RuntimeError("Conversation fine-tuning produced no candidate checkpoint.")
+    best = torch.load(CANDIDATE, map_location=device, weights_only=False)
     model.load_state_dict(best["model"], strict=True)
     test_loss = evaluate(model, test, cfg["ctx"], device)
+    accepted = test_loss < base_test_loss
+    if accepted:
+        CANDIDATE.replace(CONVERSATION)
+    else:
+        CANDIDATE.unlink(missing_ok=True)
     report = {
-        "status": "conversational_finetune_complete",
+        "status": "candidate_accepted" if accepted else "candidate_rejected_no_test_improvement",
+        "quality_gate": {"metric": "held-out conversation next-token loss", "baseline_test_loss": float(base_test_loss), "candidate_test_loss": float(test_loss), "passed": accepted},
         "architecture": "random-init byte Transformer",
         "pretrained_weights": False, "external_inference_api": False,
         "base_checkpoint": str(base_path.relative_to(ROOT.parent)),
@@ -125,7 +139,7 @@ def main():
         "heldout_test_loss": float(test_loss),
         "objective": OBJECTIVE, "stage": "conversational_finetuning",
         "dataset": meta,
-        "note": "Loss measures held-out next-token prediction on answer bytes; it does not prove coherent dialogue. Inspect generated samples too.",
+        "note": "Publish only when held-out conversation loss improves over the base checkpoint. This is a regression guard, not proof of coherent dialogue; inspect generated samples too.",
         "elapsed_seconds": round(time.time() - start, 1),
     }
     (OUT / "conversation-report.json").write_text(json.dumps(report, indent=2) + "\n")
