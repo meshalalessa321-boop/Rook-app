@@ -102,7 +102,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--steps 6000 --ctx 256 --batch 8)
+          args=(--steps 1500 --ctx 256 --batch 8)
           if [[ "${{ steps.resume.outputs.fresh }}" == "true" ]]; then
             args+=(--fresh)
             echo "Corpus changed: starting a new random-initialized checkpoint lineage."
