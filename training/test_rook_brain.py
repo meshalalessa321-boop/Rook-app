@@ -205,6 +205,9 @@ class RookBrainTests(unittest.TestCase):
             try:
                 import onnx, onnxruntime  # noqa: F401
             except ImportError:
+                import os
+                if os.environ.get("CI"):
+                    raise  # On GitHub the export libraries are installed, so a skip would hide a problem.
                 self.skipTest("onnx/onnxruntime not installed; training and resume checks passed")
             export = subprocess.run([sys.executable, str(root / "export_rook_brain_onnx.py"),
                                      "--checkpoint", str(out / "best.pt"), "--model-out", str(tmp / "m.onnx"),
