@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/rook-training.yml"
       - "training/rook_brain.py"
+      - "training/rook_tokenizer.py"
       - "training/train_rook_next.py"
       - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
@@ -48,18 +49,18 @@ jobs:
             training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-brain-state-v1-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            rook-brain-state-v1-${{ runner.os }}-
+            rook-brain-state-v2-${{ runner.os }}-
 
       - name: Install training dependencies
-        run: python -m pip install -r training/requirements.txt
+        run: python -m pip install -r training/requirements.txt onnx onnxruntime numpy
 
       - name: Prepare documented language corpus
         run: python training/prepare_wikitext.py
 
       - name: Add documented simple English stories (TinyStories)
-        run: python training/prepare_tinystories.py --max-stories 100000
+        run: python training/prepare_tinystories.py --max-stories 200000
 
       - name: Add documented English conversation transcripts
         run: python training/prepare_conversations.py
@@ -69,6 +70,17 @@ jobs:
 
       - name: Audit corpus and provenance
         run: python training/rook_brain.py --audit-only
+
+      - name: Smoke-test train, tokenizer, ONNX export and generation on a small slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          SMOKE="$RUNNER_TEMP/rook-smoke"
+          python training/rook_brain.py --smoke --out-dir "$SMOKE"
+          python training/export_rook_brain_onnx.py --checkpoint "$SMOKE/best.pt" \
+            --model-out "$SMOKE/model.onnx" --manifest-out "$SMOKE/brain.json" \
+            --tokenizer-out "$SMOKE/tokenizer.json"
+          test -s "$SMOKE/tokenizer.json"
 
       - name: Select resume mode for this exact corpus
         id: resume
@@ -102,7 +114,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--steps 1500 --ctx 256 --batch 8)
+          args=(--steps 2000 --ctx 256 --batch 8)
           if [[ "${{ steps.resume.outputs.fresh }}" == "true" ]]; then
             args+=(--fresh)
             echo "Corpus changed: starting a new random-initialized checkpoint lineage."
@@ -111,9 +123,6 @@ jobs:
 
       # Do not run assistant-response fine-tuning here. It reintroduces the
       # answer-only objective this from-scratch full-sequence pipeline replaces.
-
-      - name: Install ONNX export and browser-runtime test dependencies
-        run: python -m pip install onnx onnxruntime numpy
 
       - name: Export and test the exact Rook Brain checkpoint trained in this run
         run: python training/export_rook_brain_onnx.py
@@ -126,7 +135,7 @@ jobs:
             training/artifacts/rook-brain
             ~/.cache/huggingface/datasets
             ~/.cache/huggingface/hub
-          key: rook-brain-state-v1-${{ runner.os }}-${{ github.run_id }}
+          key: rook-brain-state-v2-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload training report
         if: always() && hashFiles('training/artifacts/rook-brain/report.json') != ''
@@ -160,7 +169,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "Rook Brain browser model" --notes "Automatically updated, runtime-verified browser export of Rook's from-scratch checkpoint. No pretrained weights or external inference API."
           fi
-          gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json --clobber
+          gh release upload "$TAG" models/rook-brain.onnx rook-status/brain.json rook-status/tokenizer.json --clobber
 
       - name: Publish browser model on a stable raw-content branch
         if: success()
@@ -174,10 +183,12 @@ jobs:
           mkdir -p /tmp/rook-model-publish
           cp models/rook-brain.onnx /tmp/rook-model-publish/rook-brain.onnx
           cp rook-status/brain.json /tmp/rook-model-publish/brain.json
+          cp rook-status/tokenizer.json /tmp/rook-model-publish/tokenizer.json
           git checkout --orphan rook-model-publish
           git rm -rf . >/dev/null 2>&1 || true
           cp /tmp/rook-model-publish/rook-brain.onnx ./rook-brain.onnx
           cp /tmp/rook-model-publish/brain.json ./brain.json
-          git add rook-brain.onnx brain.json
+          cp /tmp/rook-model-publish/tokenizer.json ./tokenizer.json
+          git add rook-brain.onnx brain.json tokenizer.json
           git commit -m "Publish latest verified Rook browser model"
           git push --force origin HEAD:rook-model
