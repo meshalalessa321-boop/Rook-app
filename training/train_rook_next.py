@@ -78,8 +78,9 @@ class Block(nn.Module):
  def forward(self,x):
   t=x.size(1);m=torch.triu(torch.ones(t,t,device=x.device,dtype=torch.bool),1);z=self.n1(x);a,_=self.a(z,z,z,attn_mask=m,need_weights=False);x=x+self.drop(a);return x+self.drop(self.f(self.n2(x)))
 class Rook(nn.Module):
- def __init__(self,d=384,l=8,h=6,c=512,dropout=0.0):
-  super().__init__();self.c=c;self.t=nn.Embedding(V,d);self.p=nn.Embedding(c,d);self.b=nn.ModuleList([Block(d,h,dropout) for _ in range(l)]);self.n=nn.LayerNorm(d);self.o=nn.Linear(d,V,bias=False);self.o.weight=self.t.weight
+ def __init__(self,d=384,l=8,h=6,c=512,dropout=0.0,vocab=V):
+  # vocab defaults to the original 259 byte tokens; rook_brain.py passes the BPE vocabulary size.
+  super().__init__();self.c=c;self.vocab=vocab;self.t=nn.Embedding(vocab,d);self.p=nn.Embedding(c,d);self.b=nn.ModuleList([Block(d,h,dropout) for _ in range(l)]);self.n=nn.LayerNorm(d);self.o=nn.Linear(d,vocab,bias=False);self.o.weight=self.t.weight
  def forward(self,x):
   x=x[:,-self.c:];z=self.t(x)+self.p(torch.arange(x.size(1),device=x.device))[None]
   for b in self.b:z=b(z)

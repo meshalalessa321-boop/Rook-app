@@ -29,3 +29,15 @@ Never place a hidden or explicit instruction in Rook's model context telling him
 ## Current training workflow
 
 The GitHub Actions workflow `.github/workflows/rook-training.yml` runs on a daily schedule and can also be started manually. It prepares WikiText-2 and English OpenAssistant conversation transcripts, then predicts the next token across every non-padding token in every document. Compatible checkpoints are cached between runs. On a successful run, the workflow exports the exact full-sequence checkpoint, runs ONNX and autoregressive smoke tests, uploads the report/checkpoint, and publishes the verified model to the stable browser-model branch and release. Runtime checks establish that inference works, not that the model is conversationally coherent.
+
+## Tokenizer: byte-level BPE (`rook_tokenizer.py`)
+
+Rook now reads text as learned sub-word tokens instead of single bytes, so the same 256-token context covers roughly four times as much text and the small model spends less effort learning to spell.
+
+- The merges are learned **only from Rook's own training split** (`rook_brain.py --vocab-size 4096`). No pretrained tokenizer or vocabulary is used, and validation/test text never shapes it.
+- Every byte sequence round-trips exactly. The tokenizer adds no identity, role, instruction or canned text.
+- Conversation transcripts use neutral `Person A` / `Person B` labels, in training and in the chat page.
+- The tokenizer is stored inside every checkpoint, so a resumed run always keeps the tokenizer its weights were trained with. It is published as `tokenizer.json` next to the model, and `rook-tokenizer.js` runs the same rules in the browser (`test_tokenizer_js.py` checks Python and JavaScript agree).
+- Changing the tokenizer means a new model: the workflow cache key moved to `v2`, so the next run starts from random initialization.
+- `rook_brain.py --smoke --out-dir ...` plus `export_rook_brain_onnx.py --checkpoint ...` is run at the start of every training workflow, so a broken export fails in minutes instead of after hours of training.
+
