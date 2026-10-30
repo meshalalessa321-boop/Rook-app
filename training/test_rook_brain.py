@@ -224,7 +224,7 @@ class RookBrainTests(unittest.TestCase):
         import re
         from pathlib import Path
         root = Path(__file__).resolve().parent
-        files = ["rook_brain.py", "rook_tokenizer.py", "export_rook_brain_onnx.py", "prepare_conversations.py",
+        files = ["rook_brain.py", "rook_tokenizer.py", "export_rook_brain_onnx.py", "prepare_dialogue.py",
                  "prepare_tinystories.py", "prepare_wikitext.py", "../rook-talk.html", "../rook-tokenizer.js"]
         banned = [r"\bAssistant:", r"\bUser:", r"you are (an? )?(ai|assistant|chatbot|machine|language model|robot)",
                   r"i am (an? )?(ai|assistant|chatbot|machine|language model|robot)", r"as an ai\b"]
@@ -239,6 +239,43 @@ class RookBrainTests(unittest.TestCase):
         self.assertIn('src="./rook-tokenizer.js"', page)
         self.assertIn("generateBpe", page)
         self.assertIn("Person B:", page)
+
+    def test_source_weights_repeat_training_text_and_are_reported(self):
+        from rook_brain import expand_weights, source_mixture
+        docs = [{"text": "s" * 900, "source": "roneneldan/TinyStories story shard", "weight": 1},
+                {"text": "d" * 100, "source": "li2017dailydialog/daily_dialog dialogue shard", "weight": 3}]
+        expanded = expand_weights(docs)
+        self.assertEqual([d["source"].split()[0] for d in expanded].count("li2017dailydialog/daily_dialog"), 3)
+        mix = source_mixture(docs)
+        self.assertAlmostEqual(mix["roneneldan/TinyStories"], 900 / 1200, places=3)
+        self.assertAlmostEqual(mix["li2017dailydialog/daily_dialog"], 300 / 1200, places=3)
+
+    def test_manifest_weight_is_read_and_limited(self):
+        import json, tempfile
+        from pathlib import Path
+        from rook_brain import load_documents
+        with tempfile.TemporaryDirectory() as tmp:
+            corpus = Path(tmp)
+            rows = []
+            for i in range(4):
+                (corpus / f"d{i}.txt").write_text(f"document {i} " * 60, encoding="utf-8")
+                rows.append({"path": f"d{i}.txt", "source": "t", "license": "CC0-1.0", "url": "u", "language": "en",
+                             **({"weight": 3} if i == 0 else {})})
+            (corpus / "manifest.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+            docs, _ = load_documents(corpus)
+            self.assertEqual([d["weight"] for d in docs], [3, 1, 1, 1])
+            rows[0]["weight"] = 99
+            (corpus / "manifest.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                load_documents(corpus)
+
+    def test_workflow_uses_human_dialogue_not_openassistant(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent
+        workflow = (root.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
+        self.assertIn("python training/prepare_dialogue.py", workflow)
+        self.assertNotIn("prepare_conversations", workflow)
+        self.assertNotIn("oasst", workflow.lower())
 
 if __name__ == "__main__":
     unittest.main()
