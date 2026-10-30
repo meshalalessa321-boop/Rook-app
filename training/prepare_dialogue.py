@@ -2,8 +2,8 @@
 """Add everyday human-to-human dialogue (DailyDialog) to the documented corpus.
 
 Why: nearly all of Rook's text is stories, so a greeting gets a story back. Real
-two-person conversation teaches what comes after "hello" without teaching him to
-be an assistant: both speakers are people, and nobody is cast as helper or helped.
+two-person conversation teaches what comes after "hello" without casting him in
+any role: both speakers are people, and nobody is the helper or the one helped.
 
 Rules this script follows:
   * Speakers are labelled "Person A" / "Person B" in alternation. No assistant,
