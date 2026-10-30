@@ -34,6 +34,8 @@ class ColabNotebookTests(unittest.TestCase):
         everything = "\n".join(self.code)
         self.assertIn("training/rook_brain.py", everything)
         self.assertNotIn("finetune_rook_conversation", everything)
+        self.assertNotIn("prepare_conversations", everything)
+        self.assertIn("prepare_dialogue.py", everything)
         self.assertIn("Person A:", everything)
         for pattern in (r"\bAssistant:", r"\bUser:", r"you are (an? )?(ai|assistant|chatbot|machine)",
                         r"i am (an? )?(ai|assistant|chatbot|machine)"):

@@ -1,0 +1,45 @@
+name: Rook Data Prep Check
+
+on:
+  pull_request:
+    paths:
+      - "training/prepare_*.py"
+      - "training/rook_brain.py"
+      - ".github/workflows/rook-data-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dialogue-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r training/requirements.txt
+      - name: Download a slice of every data source and audit the mix
+        run: |
+          set -euo pipefail
+          python training/prepare_wikitext.py
+          python training/prepare_tinystories.py --max-stories 3000
+          python training/prepare_dialogue.py --max-dialogues 600 --min-dialogues 300
+          head -c 500 training/corpus/dialogue/dailydialog-00000.txt
+          python training/rook_brain.py --audit-only --out-dir "$RUNNER_TEMP/audit"
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, "training")
+          from rook_brain import load_documents, source_mixture, split_docs
+          docs, _ = load_documents()
+          train, _, _ = split_docs(docs, 1701)
+          mix = source_mixture(train)
+          print(json.dumps(mix, indent=1))
+          dialogue = [v for k, v in mix.items() if "daily_dialog" in k]
+          assert dialogue and dialogue[0] > 0.05, "dialogue is missing or too small in the training mix"
+          PY

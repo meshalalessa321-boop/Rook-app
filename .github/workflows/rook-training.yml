@@ -14,7 +14,7 @@ on:
       - "training/export_rook_brain_onnx.py"
       - "training/prepare_wikitext.py"
       - "training/prepare_tinystories.py"
-      - "training/prepare_conversations.py"
+      - "training/prepare_dialogue.py"
       - "training/test_rook_brain.py"
       - "training/requirements.txt"
       - "training/corpus/**"
@@ -62,8 +62,8 @@ jobs:
       - name: Add documented simple English stories (TinyStories)
         run: python training/prepare_tinystories.py --max-stories 200000
 
-      - name: Add documented English conversation transcripts
-        run: python training/prepare_conversations.py
+      - name: Add everyday human dialogue (DailyDialog, neutral Person A / Person B labels)
+        run: python training/prepare_dialogue.py
 
       - name: Run training pipeline tests
         run: python -m unittest discover -s training -v

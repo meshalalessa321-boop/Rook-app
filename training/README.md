@@ -41,3 +41,13 @@ Rook now reads text as learned sub-word tokens instead of single bytes, so the s
 - Changing the tokenizer means a new model: the workflow cache key moved to `v2`, so the next run starts from random initialization.
 - `rook_brain.py --smoke --out-dir ...` plus `export_rook_brain_onnx.py --checkpoint ...` is run at the start of every training workflow, so a broken export fails in minutes instead of after hours of training.
 
+## Data mix: stories, Wikipedia text, and human dialogue
+
+OpenAssistant is no longer used. Its conversations are people asking an AI to do things, which teaches an assistant role even with neutral labels. The workflow now builds the corpus from:
+
+- WikiText-2 (Wikipedia-derived text),
+- TinyStories (simple English written for very small models),
+- DailyDialog (everyday conversations between people, CC BY-NC-SA 4.0: non-commercial, share-alike; check before commercial use or redistribution).
+
+Dialogue is labelled `Person A` / `Person B` in alternation, both sides are ordinary next-token targets, and nothing tells Rook what he is. Each manifest row can carry a `weight` (1 to 8): the training split repeats that source's text that many times, so a small source of real conversation is not drowned out by stories. Validation and test text are never repeated. `rook_brain.py` prints and saves `training_mixture` so the actual share of each source is visible. `rook-data-check.yml` downloads a slice of every source on pull requests that touch data preparation.
+

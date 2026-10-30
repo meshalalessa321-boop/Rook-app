@@ -55,11 +55,14 @@ def load_documents(corpus_dir=None):
             audit.append({"path": row["path"], "status": "skipped_duplicate", "sha256": digest})
             continue
         seen.add(digest)
-        docs.append({"path": row["path"], "text": text, "source": row["source"],
+        weight = int(row.get("weight", 1) or 1)
+        if not 1 <= weight <= 8:
+            raise SystemExit(f"Manifest line {line_no}: weight must be between 1 and 8, got {weight}")
+        docs.append({"path": row["path"], "text": text, "source": row["source"], "weight": weight,
                      "license": row["license"], "url": row["url"], "language": row["language"],
                      "sha256": digest})
         audit.append({"path": row["path"], "status": "included", "bytes": len(text.encode("utf-8")),
-                      "license": row["license"], "language": row["language"], "sha256": digest})
+                      "license": row["license"], "language": row["language"], "weight": weight, "sha256": digest})
     if len(docs) < 3:
         raise SystemExit(f"Need at least 3 distinct, non-duplicate text documents; found {len(docs)}.")
     return docs, audit
@@ -80,6 +83,19 @@ def split_docs(docs, seed):
     return ([docs[i] for i in sorted(train_ids)],
             [docs[i] for i in sorted(val_ids)],
             [docs[i] for i in sorted(test_ids)])
+
+def expand_weights(docs):
+    """Repeat each training document `weight` times (validation and test are never repeated)."""
+    return [doc for doc in docs for _ in range(doc.get("weight", 1))]
+
+def source_mixture(docs):
+    """Share of training text per source family, counting weights. Used to check the data mix."""
+    totals = {}
+    for doc in docs:
+        family = doc["source"].split(":")[0].replace(" dialogue shard", "").replace(" story shard", "")
+        totals[family] = totals.get(family, 0) + len(doc["text"].encode("utf-8")) * doc.get("weight", 1)
+    whole = sum(totals.values()) or 1
+    return {family: round(size / whole, 4) for family, size in sorted(totals.items(), key=lambda kv: -kv[1])}
 
 class Windows(Sequence):
     """Lazy (x, y) training windows over compact token arrays (2 bytes per token).
@@ -225,12 +241,14 @@ def main():
         tokenizer = byte_tokenizer()
         tokenizer_source = "plain bytes"
     vocab, pad = tokenizer.vocab_size, tokenizer.pad
-    train = examples(train_docs, ctx, tokenizer)
+    mixture = source_mixture(train_docs)
+    print(json.dumps({"event": "training_mixture", "share_of_training_text_by_source": mixture}), flush=True)
+    train = examples(expand_weights(train_docs), ctx, tokenizer)
     valid = examples(val_docs, ctx, tokenizer)
     test = examples(test_docs, ctx, tokenizer)
     if not train or not valid or not test:
         raise SystemExit("Train/validation/test split produced an empty set.")
-    train_bytes = sum(len(doc["text"].encode("utf-8")) for doc in train_docs)
+    train_bytes = sum(len(doc["text"].encode("utf-8")) * doc.get("weight", 1) for doc in train_docs)
     tokenizer_info = {"format": "rook-bytebpe-v1" if tokenizer.n else "plain-bytes", "vocab_size": vocab,
                       "merges": tokenizer.n, "sha256": tokenizer.digest(), "source": tokenizer_source,
                       "train_tokens": train.tokens, "train_bytes": train_bytes,
@@ -278,7 +296,7 @@ def main():
     report = {"architecture": "random-init byte-level BPE Transformer" if tokenizer.n else "random-init byte Transformer",
               "pretrained_weights": False,
               "external_inference_api": False, "objective": "full-sequence next-token prediction",
-              "speaker_role_objective": False, "config": config, "tokenizer": tokenizer_info,
+              "speaker_role_objective": False, "config": config, "tokenizer": tokenizer_info, "training_mixture": mixture,
               "corpus_fingerprint": corpus_fingerprint,
               "training": {"lr": a.lr, "dropout": a.dropout, "batch": batch_size, "accum": a.accum,
                            "warmup": a.warmup, "min_lr_ratio": a.min_lr_ratio},
