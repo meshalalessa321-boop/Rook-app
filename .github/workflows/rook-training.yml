@@ -3,7 +3,9 @@ name: Rook Brain Training
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 4 * * *"
+    # Every 6 hours (00:17, 06:17, 12:17, 18:17 UTC). A run takes about 3-4 hours, and the
+    # concurrency group below queues a run that starts while another is still going.
+    - cron: "17 */6 * * *"
   push:
     branches: [main]
     paths:
