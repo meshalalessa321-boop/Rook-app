@@ -1,0 +1,56 @@
+{
+  "status": "verified",
+  "model": "./models/rook-brain.onnx",
+  "format": "ONNX",
+  "source_checkpoint": "training/artifacts/rook-brain/best.pt",
+  "stage": "full_sequence_pretraining",
+  "finetune_steps": 0,
+  "training_step": 6000,
+  "validation_loss": 3.955416639601906,
+  "objective": "full-sequence next-token prediction",
+  "config": {
+    "d": 384,
+    "layers": 8,
+    "heads": 6,
+    "ctx": 256,
+    "vocab": 4096,
+    "position_scheme": "prefix-right-pad-v2",
+    "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1"
+  },
+  "tokenizer": {
+    "format": "rook-bytebpe-v1",
+    "file": "tokenizer.json",
+    "vocab_size": 4096,
+    "merges": 3837,
+    "sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1",
+    "learned_from": "Rook's own training split; no pretrained tokenizer"
+  },
+  "parameters": 15867648,
+  "pretrained_weights": false,
+  "external_inference_api": false,
+  "position_scheme": "prefix-right-pad-v2",
+  "input": {
+    "name": "tokens",
+    "dtype": "int64",
+    "shape": [
+      1,
+      256
+    ]
+  },
+  "output": {
+    "name": "logits",
+    "dtype": "float32",
+    "shape": [
+      1,
+      256,
+      4096
+    ]
+  },
+  "model_bytes": 72465041,
+  "model_sha256": "65318ae097d471edaebb8f6cc334d2748b43618f3e48c2781024ad4ad78881ad",
+  "tensor_smoke_test": "passed",
+  "onnx_matches_pytorch": "passed",
+  "autoregressive_smoke_test": "passed",
+  "sample_for_test_prompt": " I'm not.\nPerson A: I'm not.\nPerson B: I'm sorry",
+  "quality_note": "Runtime checks verify execution only. Review the generated sample and held-out test loss before treating this as conversationally capable."
+}
