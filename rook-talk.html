@@ -22,7 +22,7 @@ function sample(logits,temp=.72,topK=32){const c=[];for(let i=0;i<VOCAB;i++)c.pu
 async function generate(text,onUpdate){return TOK?generateBpe(text,onUpdate):generateBytes(text,onUpdate)}
 async function generateBpe(text,onUpdate){
 const promptText=makePromptText(text),base=[BOS,...TOK.encode(promptText)],generated=[],limit=256+TOK.n;
-const mask=/[\u0600-\u06FF]/.test(promptText)?MASK_UNI:MASK_ASCII,turn=/\n\s*Person [AB]:/,clean=t=>t.replace(/\uFFFD+$/,"");
+const mask=/[\u0600-\u06FF]/.test(promptText)?MASK_UNI:MASK_ASCII,turn=/\n\s*Person [AB]:/,clean=t=>t.replace(/\uFFFD+$/,""),hold=t=>t.replace(/\n\s*(?:P(?:e(?:r(?:s(?:o(?:n(?:\s(?:[AB])?)?)?)?)?)?)?)?$/,"");
 for(let step=0;step<90;step++){
 let tokens=base.concat(generated);if(tokens.length>CTX)tokens=tokens.slice(-CTX);
 const arr=new BigInt64Array(CTX);arr.fill(BigInt(PAD));
@@ -36,7 +36,7 @@ if(next===EOS)break;
 generated.push(next);
 const full=TOK.decode(generated),cut=full.search(turn);
 if(cut>=0){onUpdate(clean(full.slice(0,cut)));break}
-onUpdate(clean(full));
+onUpdate(clean(hold(full)));
 if(step%3===0)await new Promise(resolve=>setTimeout(resolve,0))}
 let out=TOK.decode(generated);const cut=out.search(turn);if(cut>=0)out=out.slice(0,cut);
 return out.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]+/g,"").trim()}
