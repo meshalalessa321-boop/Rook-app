@@ -286,8 +286,8 @@ class RookBrainTests(unittest.TestCase):
 
     def test_source_weight_overrides_and_errors(self):
         from rook_brain import apply_source_weights
-        docs = [{"text": "a", "source": "li2017dailydialog/daily_dialog dialogue shard 1", "weight": 3},
-                {"text": "b", "source": "roneneldan/TinyStories story shard 1", "weight": 1}]
+        docs = [{"text": "a", "source": "li2017dailydialog/daily_dialog dialogue shard: 1", "weight": 3},
+                {"text": "b", "source": "roneneldan/TinyStories story shard: 1", "weight": 1}]
         out = apply_source_weights(docs, ["li2017dailydialog/daily_dialog=6"])
         self.assertEqual([d["weight"] for d in out], [6, 1])
         for bad in (["nope=2"], ["li2017dailydialog/daily_dialog=9"], ["li2017dailydialog/daily_dialog=x"], ["novalue"]):
