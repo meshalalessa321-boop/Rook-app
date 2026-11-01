@@ -21,5 +21,11 @@ class ChatPageTests(unittest.TestCase):
         self.assertEqual(regex.sub("", "a\nPlaying is fun."), "a\nPlaying is fun.")
 
 
+    def test_correction_buttons_and_teach_panel_are_hidden(self):
+        # Corrections no longer feed training, so the page must not offer them.
+        page = PAGE.read_text(encoding="utf-8")
+        self.assertNotIn("addCorrectionEditor(reply", page)
+        self.assertIn('<section class="training" hidden style="display:none">', page)
+
 if __name__ == "__main__":
     unittest.main()
