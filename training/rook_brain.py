@@ -88,11 +88,46 @@ def expand_weights(docs):
     """Repeat each training document `weight` times (validation and test are never repeated)."""
     return [doc for doc in docs for _ in range(doc.get("weight", 1))]
 
+def source_family(source):
+    """Group per-file sources (one per article/shard) into one name per dataset."""
+    return source.split(":")[0].replace(" dialogue shard", "").replace(" story shard", "")
+
+def apply_source_weights(docs, specs):
+    """Override manifest weights from the command line: --source-weight li2017dailydialog/daily_dialog=6."""
+    wanted = {}
+    for spec in specs or []:
+        family, sep, number = spec.rpartition("=")
+        if not sep or not family:
+            raise SystemExit(f"--source-weight needs NAME=N, got {spec!r}")
+        try:
+            weight = int(number)
+        except ValueError:
+            raise SystemExit(f"--source-weight needs a whole number, got {spec!r}")
+        if not 1 <= weight <= 8:
+            raise SystemExit(f"--source-weight must be between 1 and 8, got {spec!r}")
+        wanted[family] = weight
+    families = {source_family(doc["source"]) for doc in docs}
+    for family in wanted:
+        if family not in families:
+            raise SystemExit(f"--source-weight: no source named {family!r}. Known: {sorted(families)[:5]}")
+    for doc in docs:
+        weight = wanted.get(source_family(doc["source"]))
+        if weight:
+            doc["weight"] = weight
+    return docs
+
+def lr_at_progress(step, base_lr, warmup, progress, min_ratio):
+    """Like lr_at, but the cosine decay follows the fraction of the time budget used (0 to 1)."""
+    if warmup > 0 and step <= warmup:
+        return base_lr * step / warmup
+    progress = min(1.0, max(0.0, progress))
+    return base_lr * (min_ratio + (1.0 - min_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress)))
+
 def source_mixture(docs):
     """Share of training text per source family, counting weights. Used to check the data mix."""
     totals = {}
     for doc in docs:
-        family = doc["source"].split(":")[0].replace(" dialogue shard", "").replace(" story shard", "")
+        family = source_family(doc["source"])
         totals[family] = totals.get(family, 0) + len(doc["text"].encode("utf-8")) * doc.get("weight", 1)
     whole = sum(totals.values()) or 1
     return {family: round(size / whole, 4) for family, size in sorted(totals.items(), key=lambda kv: -kv[1])}
@@ -189,6 +224,9 @@ def main():
     p.add_argument("--tokenizer-sample-mb", type=int, default=30, help="Training text (MB) used to learn the BPE merges.")
     p.add_argument("--corpus-dir", default=None, help="Corpus folder containing manifest.jsonl (default: training/corpus).")
     p.add_argument("--out-dir", default=None, help="Where checkpoints and reports go (default: training/artifacts/rook-brain).")
+    p.add_argument("--max-minutes", type=float, default=0.0, help="Stop after this many minutes of training (0 = no limit). The learning rate decays over the time budget.")
+    p.add_argument("--source-weight", action="append", default=[], metavar="NAME=N", help="Override a source's training repeat weight (1-8). Can be given more than once.")
+    p.add_argument("--run-name", default="", help="Label stored in the report, e.g. the name of a variant being compared.")
     p.add_argument("--audit-only", action="store_true")
     p.add_argument("--smoke", action="store_true", help="Run two tiny steps to validate the pipeline.")
     p.add_argument("--fresh", action="store_true", help="Ignore saved Rook Brain state and start from random weights.")
@@ -197,6 +235,7 @@ def main():
     random.seed(a.seed)
     torch.manual_seed(a.seed)
     docs, audit = load_documents(a.corpus_dir)
+    docs = apply_source_weights(docs, a.source_weight)
     manifest = {"objective": "full-sequence next-token prediction",
                 "architecture": "random-init Transformer",
                 "pretrained_weights": False, "external_inference_api": False,
@@ -304,10 +343,15 @@ def main():
     (out / "dataset_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     total_steps = a.total_steps if a.total_steps > 0 else start_step + steps
     accum = 1 if a.smoke else max(1, a.accum)
+    last_step, stopped_by = start_step, "step limit"
     for step in range(start_step + 1, start_step + steps + 1):
         model.train()
+        budget = a.max_minutes * 60.0
         for group in optimizer.param_groups:
-            group["lr"] = lr_at(step, a.lr, a.warmup, total_steps, a.min_lr_ratio)
+            if budget > 0:
+                group["lr"] = lr_at_progress(step, a.lr, a.warmup, (time.time() - start) / budget, a.min_lr_ratio)
+            else:
+                group["lr"] = lr_at(step, a.lr, a.warmup, total_steps, a.min_lr_ratio)
         optimizer.zero_grad(set_to_none=True)
         loss_sum = 0.0
         for _ in range(accum):
@@ -323,7 +367,9 @@ def main():
         loss = torch.tensor(loss_sum / accum)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
-        if step == start_step + 1 or step % 100 == 0 or step == start_step + steps:
+        last_step = step
+        time_up = budget > 0 and (time.time() - start) >= budget
+        if step == start_step + 1 or step % 100 == 0 or step == start_step + steps or time_up:
             val = evaluate(model, valid, device, pad=pad)
             print(json.dumps({"step":step,"train_loss":float(loss.item()),"validation":val,
                               "elapsed_seconds":round(time.time()-start,1)}), flush=True)
@@ -337,11 +383,15 @@ def main():
                         "corpus_fingerprint":corpus_fingerprint,
                         "python_rng":random.getstate(),"torch_rng":torch.get_rng_state(),
                         "objective":report["objective"], **tokenizer_extra}, resume_path)
+        if time_up:
+            stopped_by = "time budget"
+            break
     ck = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(ck["model"])
     report.update({"best_step":ck["step"],"best_validation":evaluate(model,valid,device,pad=pad),
                    "heldout_test":evaluate(model,test,device,pad=pad),
                    "elapsed_seconds":round(time.time()-start,1),
+                   "run_name":a.run_name, "steps_this_run":last_step-start_step, "stopped_by":stopped_by,
                    "note":"Loss is a language-modeling metric, not proof of semantic understanding."})
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("FINAL_REPORT " + json.dumps(report, ensure_ascii=False), flush=True)
