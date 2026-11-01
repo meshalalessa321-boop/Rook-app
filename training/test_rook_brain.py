@@ -225,7 +225,7 @@ class RookBrainTests(unittest.TestCase):
         from pathlib import Path
         root = Path(__file__).resolve().parent
         files = ["rook_brain.py", "rook_tokenizer.py", "export_rook_brain_onnx.py", "prepare_dialogue.py",
-                 "prepare_tinystories.py", "prepare_wikitext.py", "../rook-talk.html", "../rook-tokenizer.js"]
+                 "prepare_tinystories.py", "prepare_wikitext.py", "sample_checkpoint.py", "../rook-talk.html", "../rook-tokenizer.js"]
         banned = [r"\bAssistant:", r"\bUser:", r"you are (an? )?(ai|assistant|chatbot|machine|language model|robot)",
                   r"i am (an? )?(ai|assistant|chatbot|machine|language model|robot)", r"as an ai\b"]
         for name in files:
@@ -276,6 +276,37 @@ class RookBrainTests(unittest.TestCase):
         self.assertIn("python training/prepare_dialogue.py", workflow)
         self.assertNotIn("prepare_conversations", workflow)
         self.assertNotIn("oasst", workflow.lower())
+
+    def test_lr_at_progress_follows_time_budget(self):
+        from rook_brain import lr_at_progress
+        self.assertAlmostEqual(lr_at_progress(100, 1.0, 200, 0.0, 0.1), 0.5)
+        self.assertAlmostEqual(lr_at_progress(300, 1.0, 200, 0.0, 0.1), 1.0)
+        self.assertAlmostEqual(lr_at_progress(300, 1.0, 200, 1.0, 0.1), 0.1)
+        self.assertAlmostEqual(lr_at_progress(300, 1.0, 200, 5.0, 0.1), 0.1)
+
+    def test_source_weight_overrides_and_errors(self):
+        from rook_brain import apply_source_weights
+        docs = [{"text": "a", "source": "li2017dailydialog/daily_dialog dialogue shard 1", "weight": 3},
+                {"text": "b", "source": "roneneldan/TinyStories story shard 1", "weight": 1}]
+        out = apply_source_weights(docs, ["li2017dailydialog/daily_dialog=6"])
+        self.assertEqual([d["weight"] for d in out], [6, 1])
+        for bad in (["nope=2"], ["li2017dailydialog/daily_dialog=9"], ["li2017dailydialog/daily_dialog=x"], ["novalue"]):
+            with self.assertRaises(SystemExit):
+                apply_source_weights([dict(d) for d in docs], bad)
+
+    def test_variants_workflow_is_a_fair_experiment_and_not_published(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent
+        text = (root / ".github" / "workflows" / "rook-variants.yml").read_text(encoding="utf-8")
+        self.assertEqual(text.count("--max-minutes"), 1)
+        self.assertEqual(text.count("          - name:"), 4)
+        self.assertIn("--fresh", text)
+        self.assertIn("prepare_dialogue.py", text)
+        self.assertNotIn("rook-brain-latest", text)
+        self.assertNotIn("rook-model", text.replace("rook-variant-results", ""))
+        self.assertNotIn("prepare_conversations", text)
+        sample = (root / "training" / "sample_checkpoint.py").read_text(encoding="utf-8")
+        self.assertIn("Person A:", sample)
 
 if __name__ == "__main__":
     unittest.main()

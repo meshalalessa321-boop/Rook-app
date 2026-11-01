@@ -1,0 +1,134 @@
+name: Rook Variant Comparison
+
+# Trains four differently-configured Rook models from random initialization, each for the same
+# wall-clock time on the same data and tokenizer, then publishes their held-out losses and
+# sample replies so the best CPU-trainable setup can be chosen. Nothing here is published
+# to the chat page: these runs are experiments only.
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Training minutes per variant (data prep takes extra)"
+        default: "240"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rook-variants
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: a-current
+            args: "--d 384 --layers 8 --heads 6 --lr 3e-4"
+          - name: b-small
+            args: "--d 256 --layers 6 --heads 4 --lr 3e-4"
+          - name: c-small-more-dialogue
+            args: "--d 256 --layers 6 --heads 4 --lr 3e-4 --source-weight li2017dailydialog/daily_dialog=6"
+          - name: d-current-low-lr
+            args: "--d 384 --layers 8 --heads 6 --lr 1.5e-4"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r training/requirements.txt onnx onnxruntime numpy
+
+      - name: Prepare the same documented corpus for every variant
+        run: |
+          python training/prepare_wikitext.py
+          python training/prepare_tinystories.py --max-stories 200000
+          python training/prepare_dialogue.py
+
+      - name: Train from random initialization for a fixed time budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/variant"
+          python training/rook_brain.py --fresh --out-dir "$OUT" --steps 1000000 \
+            --max-minutes "${{ inputs.minutes }}" --ctx 256 --batch 8 --run-name "${{ matrix.name }}" \
+            ${{ matrix.args }}
+
+      - name: Sample replies and collect results
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/variant"
+          mkdir -p result
+          python training/sample_checkpoint.py "$OUT/best.pt" --out result/samples.json
+          python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, "training")
+          out = os.path.join(os.environ["RUNNER_TEMP"], "variant")
+          report = json.load(open(os.path.join(out, "report.json")))
+          summary = {
+              "name": report["run_name"], "parameters": report["parameters"], "config": report["config"],
+              "training": report["training"], "steps_this_run": report["steps_this_run"],
+              "stopped_by": report["stopped_by"], "elapsed_seconds": report["elapsed_seconds"],
+              "best_step": report["best_step"],
+              "validation_loss": report["best_validation"]["loss"],
+              "heldout_test_loss": report["heldout_test"]["loss"],
+              "tokenizer_sha256": report["tokenizer"]["sha256"],
+              "training_mixture": report.get("training_mixture"),
+              "samples": json.load(open("result/samples.json")),
+          }
+          json.dump(summary, open("result/summary.json", "w"), indent=2)
+          print(json.dumps(summary)[:2000])
+          line = json.dumps({k: summary[k] for k in ("name", "parameters", "steps_this_run", "validation_loss", "heldout_test_loss", "tokenizer_sha256")})
+          print("::notice title=rook-variant::" + line)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: variant-${{ matrix.name }}
+          path: result/summary.json
+          retention-days: 30
+
+  compare:
+    needs: train
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: variant-*
+          path: collected
+
+      - name: Build results.json and publish it to the rook-variant-results branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import glob, json
+          rows = [json.load(open(p)) for p in sorted(glob.glob("collected/*/summary.json"))]
+          rows.sort(key=lambda r: r["heldout_test_loss"])
+          digests = {r["tokenizer_sha256"] for r in rows}
+          result = {"same_tokenizer_for_all": len(digests) == 1, "ranking_by_heldout_test_loss": rows}
+          json.dump(result, open("results.json", "w"), indent=2)
+          print("::notice title=rook-variant-ranking::" + json.dumps(
+              [[r["name"], round(r["heldout_test_loss"], 4)] for r in rows]) +
+              " same_tokenizer=" + str(len(digests) == 1))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan rook-variant-results
+          git rm -rf . >/dev/null 2>&1 || true
+          git add results.json
+          git commit -m "Rook variant comparison results"
+          git push --force origin HEAD:rook-variant-results
