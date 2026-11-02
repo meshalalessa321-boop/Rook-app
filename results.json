@@ -1,0 +1,225 @@
+{
+  "same_tokenizer_for_all": true,
+  "ranking_by_heldout_test_loss": [
+    {
+      "name": "b-small",
+      "parameters": 5853184,
+      "config": {
+        "d": 256,
+        "layers": 6,
+        "heads": 4,
+        "ctx": 256,
+        "vocab": 4096,
+        "position_scheme": "prefix-right-pad-v2",
+        "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1"
+      },
+      "training": {
+        "lr": 0.0003,
+        "dropout": 0.1,
+        "batch": 8,
+        "accum": 4,
+        "warmup": 200,
+        "min_lr_ratio": 0.1
+      },
+      "steps_this_run": 5831,
+      "stopped_by": "time budget",
+      "elapsed_seconds": 14436.3,
+      "best_step": 5831,
+      "validation_loss": 3.850029296644988,
+      "heldout_test_loss": 3.7771610056690386,
+      "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1",
+      "training_mixture": {
+        "roneneldan/TinyStories": 0.8498,
+        "li2017dailydialog/daily_dialog": 0.0999,
+        "WikiText-2 / Wikipedia-derived article": 0.0503
+      },
+      "samples": [
+        {
+          "prompt": "Hello!",
+          "reply": "No, you's my friend. I'll get you think a big, the best."
+        },
+        {
+          "prompt": "How are you today?",
+          "reply": "I'm sorry, I'm sorry to eat my best of you about you in, that's."
+        },
+        {
+          "prompt": "What did you do this weekend?",
+          "reply": "Yes, what are my me, this is a good."
+        },
+        {
+          "prompt": "Do you like music?",
+          "reply": "I'll see, I'm sorry, I'm glad I think you see?"
+        },
+        {
+          "prompt": "I'm a little tired.",
+          "reply": "A: I'm afraid I had one, that'll be a sir?"
+        }
+      ]
+    },
+    {
+      "name": "c-small-more-dialogue",
+      "parameters": 5853184,
+      "config": {
+        "d": 256,
+        "layers": 6,
+        "heads": 4,
+        "ctx": 256,
+        "vocab": 4096,
+        "position_scheme": "prefix-right-pad-v2",
+        "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1"
+      },
+      "training": {
+        "lr": 0.0003,
+        "dropout": 0.1,
+        "batch": 8,
+        "accum": 4,
+        "warmup": 200,
+        "min_lr_ratio": 0.1
+      },
+      "steps_this_run": 6177,
+      "stopped_by": "time budget",
+      "elapsed_seconds": 14429.9,
+      "best_step": 6177,
+      "validation_loss": 3.8616710040820714,
+      "heldout_test_loss": 3.7869901430870203,
+      "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1",
+      "training_mixture": {
+        "roneneldan/TinyStories": 0.7726,
+        "li2017dailydialog/daily_dialog": 0.1817,
+        "WikiText-2 / Wikipedia-derived article": 0.0457
+      },
+      "samples": [
+        {
+          "prompt": "Hello!",
+          "reply": "What's a lot of the time, I'm better that's not, but I'm so, please are you have one, you'll just to the tug you."
+        },
+        {
+          "prompt": "How are you today?",
+          "reply": "I'm afraid."
+        },
+        {
+          "prompt": "What did you do this weekend?",
+          "reply": "Yes, I'd like it."
+        },
+        {
+          "prompt": "Do you like music?",
+          "reply": "I've got a little better."
+        },
+        {
+          "prompt": "I'm a little tired.",
+          "reply": "How can't get."
+        }
+      ]
+    },
+    {
+      "name": "a-current",
+      "parameters": 15867648,
+      "config": {
+        "d": 384,
+        "layers": 8,
+        "heads": 6,
+        "ctx": 256,
+        "vocab": 4096,
+        "position_scheme": "prefix-right-pad-v2",
+        "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1"
+      },
+      "training": {
+        "lr": 0.0003,
+        "dropout": 0.1,
+        "batch": 8,
+        "accum": 4,
+        "warmup": 200,
+        "min_lr_ratio": 0.1
+      },
+      "steps_this_run": 3101,
+      "stopped_by": "time budget",
+      "elapsed_seconds": 14459.9,
+      "best_step": 3101,
+      "validation_loss": 4.209423740337037,
+      "heldout_test_loss": 4.128333128634376,
+      "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1",
+      "training_mixture": {
+        "roneneldan/TinyStories": 0.8498,
+        "li2017dailydialog/daily_dialog": 0.0999,
+        "WikiText-2 / Wikipedia-derived article": 0.0503
+      },
+      "samples": [
+        {
+          "prompt": "Hello!",
+          "reply": "You are you like?"
+        },
+        {
+          "prompt": "How are you today?",
+          "reply": "I'm sorry, I'm sorry?"
+        },
+        {
+          "prompt": "What did you do this weekend?",
+          "reply": "Well, please?"
+        },
+        {
+          "prompt": "Do you like music?",
+          "reply": "I's a small."
+        },
+        {
+          "prompt": "I'm a little tired.",
+          "reply": "We can't get there."
+        }
+      ]
+    },
+    {
+      "name": "d-current-low-lr",
+      "parameters": 15867648,
+      "config": {
+        "d": 384,
+        "layers": 8,
+        "heads": 6,
+        "ctx": 256,
+        "vocab": 4096,
+        "position_scheme": "prefix-right-pad-v2",
+        "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1"
+      },
+      "training": {
+        "lr": 0.00015,
+        "dropout": 0.1,
+        "batch": 8,
+        "accum": 4,
+        "warmup": 200,
+        "min_lr_ratio": 0.1
+      },
+      "steps_this_run": 2026,
+      "stopped_by": "time budget",
+      "elapsed_seconds": 14502.2,
+      "best_step": 2026,
+      "validation_loss": 5.040438929004027,
+      "heldout_test_loss": 4.937818053811295,
+      "tokenizer_sha256": "e1fa6fabf7a699f07a5bed0da40ddc066c8510eae33caaf74f4ffd05458a69e1",
+      "training_mixture": {
+        "roneneldan/TinyStories": 0.8498,
+        "li2017dailydialog/daily_dialog": 0.0999,
+        "WikiText-2 / Wikipedia-derived article": 0.0503
+      },
+      "samples": [
+        {
+          "prompt": "Hello!",
+          "reply": "H."
+        },
+        {
+          "prompt": "How are you today?",
+          "reply": "I's."
+        },
+        {
+          "prompt": "What did you do this weekend?",
+          "reply": "H."
+        },
+        {
+          "prompt": "Do you like music?",
+          "reply": "I'mm sorry, it."
+        },
+        {
+          "prompt": "I'm a little tired.",
+          "reply": "Do you."
+        }
+      ]
+    }
+  ]
+}
