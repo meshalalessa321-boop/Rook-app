@@ -29,5 +29,10 @@ class ChatPageTests(unittest.TestCase):
         self.assertEqual(page.count("addCorrectionEditor("), 1)  # only the definition
         self.assertIn('<section class="training" hidden style="display:none">', page)
 
+    def test_status_line_shows_training_step_from_brain_json(self):
+        page = PAGE.read_text(encoding="utf-8")
+        self.assertIn("meta.training_step", page)
+        self.assertIn("STEP ", page)
+
 if __name__ == "__main__":
     unittest.main()
