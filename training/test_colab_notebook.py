@@ -42,5 +42,27 @@ class ColabNotebookTests(unittest.TestCase):
             self.assertIsNone(re.search(pattern, everything, re.I), pattern)
 
 
+class KaggleNotebookTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        nb = json.loads((Path(__file__).resolve().parent / "rook_kaggle_gpu.ipynb").read_text(encoding="utf-8"))
+        cls.code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+
+    def test_cells_parse_and_follow_the_rules(self):
+        for src in self.code:
+            if not src.startswith("%%bash"):
+                ast.parse(src)
+        everything = "\n".join(self.code)
+        self.assertIn("training/rook_brain.py", everything)
+        self.assertIn("--fresh", everything)
+        self.assertIn("--max-minutes", everything)
+        self.assertIn("prepare_dialogue.py", everything)
+        self.assertNotIn("GITHUB_TOKEN", everything)
+        self.assertNotRegex(everything, r"gh[pousr]_[A-Za-z0-9]{20,}")
+        for pattern in (r"\bAssistant:", r"\bUser:", r"you are (an? )?(ai|assistant|chatbot|machine)",
+                        r"i am (an? )?(ai|assistant|chatbot|machine)", r"finetune_rook_conversation", r"prepare_conversations"):
+            self.assertIsNone(re.search(pattern, everything, re.I), pattern)
+
+
 if __name__ == "__main__":
     unittest.main()
