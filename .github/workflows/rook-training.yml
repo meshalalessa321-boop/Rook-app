@@ -3,23 +3,9 @@ name: Rook Brain Training
 on:
   workflow_dispatch:
   schedule:
-    # Every 6 hours (00:17, 06:17, 12:17, 18:17 UTC). A run takes about 3-4 hours, and the
-    # concurrency group below queues a run that starts while another is still going.
-    - cron: "17 */6 * * *"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/rook-training.yml"
-      - "training/rook_brain.py"
-      - "training/rook_tokenizer.py"
-      - "training/train_rook_next.py"
-      - "training/export_rook_brain_onnx.py"
-      - "training/prepare_wikitext.py"
-      - "training/prepare_tinystories.py"
-      - "training/prepare_dialogue.py"
-      - "training/test_rook_brain.py"
-      - "training/requirements.txt"
-      - "training/corpus/**"
+    # Twice a day (00:17 and 12:17 UTC). Each run takes about 3-4 hours, which keeps GitHub-hosted
+    # runner use moderate. Pushes do not start training; start a run by hand when code changes.
+    - cron: "17 */12 * * *"
 
 permissions:
   contents: write

@@ -308,5 +308,12 @@ class RookBrainTests(unittest.TestCase):
         sample = (root / "training" / "sample_checkpoint.py").read_text(encoding="utf-8")
         self.assertIn("Person A:", sample)
 
+    def test_training_workflow_runs_twice_a_day_and_not_on_every_push(self):
+        from pathlib import Path
+        text = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "rook-training.yml").read_text(encoding="utf-8")
+        self.assertIn('cron: "17 */12 * * *"', text)
+        self.assertNotIn("\n  push:", text)
+        self.assertIn("workflow_dispatch:", text)
+
 if __name__ == "__main__":
     unittest.main()
