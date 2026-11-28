@@ -1,0 +1,91 @@
+name: Rook learning-speed test
+
+# Side-by-side test on a copy of Rook. It never saves to the training cache,
+# never publishes a model, and has read-only access to the repository.
+on:
+  push:
+    branches: [claude/lr-ab-test]
+    paths: [".github/workflows/rook-lr-test.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Restore Rook's latest saved progress (read only)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            training/artifacts/rook-brain
+            ~/.cache/huggingface/datasets
+            ~/.cache/huggingface/hub
+          key: rook-brain-state-v2-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            rook-brain-state-v2-${{ runner.os }}-
+      - name: Copy and fingerprint the files
+        run: |
+          set -euo pipefail
+          mkdir backup
+          cp training/artifacts/rook-brain/resume.pt training/artifacts/rook-brain/best.pt backup/
+          (cd backup && sha256sum resume.pt best.pt | tee SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rook-backup-before-lr-test
+          path: backup/
+          if-no-files-found: error
+          retention-days: 90
+
+  compare:
+    needs: backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arm: old-setting
+            extra: ""
+          - arm: new-setting
+            extra: "--total-steps 300000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r training/requirements.txt onnx onnxruntime numpy
+      - run: python training/prepare_wikitext.py
+      - run: python training/prepare_tinystories.py --max-stories 200000
+      - run: python training/prepare_dialogue.py
+      - run: python -m unittest discover -s training -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: rook-backup-before-lr-test
+          path: backup
+      - name: Make this test's own copy
+        run: |
+          set -euo pipefail
+          (cd backup && sha256sum -c SHA256SUMS.txt)
+          mkdir -p "training/artifacts/ab/${{ matrix.arm }}" results
+          cp backup/resume.pt backup/best.pt "training/artifacts/ab/${{ matrix.arm }}/"
+      - name: Score the starting point
+        run: python training/compare_checkpoints.py --checkpoint backup/resume.pt --label start --out results/start.json
+      - name: Train the copy for 2000 steps
+        run: >
+          python training/rook_brain.py --steps 2000 --ctx 256 --batch 8 ${{ matrix.extra }}
+          --out-dir "training/artifacts/ab/${{ matrix.arm }}"
+      - name: Score the final weights
+        run: >
+          python training/compare_checkpoints.py
+          --checkpoint "training/artifacts/ab/${{ matrix.arm }}/resume.pt"
+          --label "${{ matrix.arm }}" --out results/final.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rook-lr-test-${{ matrix.arm }}
+          path: |
+            results/
+            training/artifacts/ab/${{ matrix.arm }}/report.json
+          retention-days: 90
